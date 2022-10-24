@@ -1,0 +1,7 @@
+v 3
+d nnplot: create a plot of an artificial neural network
+d Author: Michael J. Crowther
+d Distribution-Date: 20220203
+f nnplot/nnplot.ado
+f nnplot/nnplot.sthlp
+e
