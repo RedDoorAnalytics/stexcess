@@ -5,165 +5,240 @@ program define stexcess, eclass sortpreserve properties(st)
         local copy0 `0'
 	syntax [anything] [if] [in] , [*]
 	if replay() & "`options'"=="" {
-		if (`"`e(cmd2)'"'!="stmerlin") error 301
+		if (`"`e(cmd2)'"'!="stexcess") error 301
 		Replay `copy0'
 		exit
 	}
 	else Estimate `copy0'
 	ereturn local cmd2 stexcess
 	ereturn local cmdline2 stexcess `copy0'
-
-
 end
 
 program Estimate, eclass
         version 17
         
-        local GLOB      INDicator(varname)      ///
-                                                //
-        
+        st_is 2 analysis
         
         _parse expand cmd glob : 0
         if `cmd_n'>2 | `cmd_n'<2 {
-                di "control and excess models required"
-                exit 1986
+                di as error "control and excess models required"
+                exit 198
         }
         local if `"`glob_if'"'
         local in `"`glob_in'"'
         local opts `"`glob_op'"'
         
-        forvalues i=1/2 {
-                
-                local 0 `"`cmd_`i''"'
-                syntax anything ,                       ///
-                                [                       ///
-                                        DF(passthru)	///
-                                        KNOTS(passthru)	///
-                                        NOORTHog	///
-                                        TIME            ///
-                                                        ///
-                                        TVC(passthru)	///
-                                        DFTvc(passthru)	///
-                                        TVCTIME		///
-                                                        ///
-                                        TIME2(string)	///
-                                        TIME3(string)	///
-                                        TIME4(string)	///
-                                        TIME5(string)	///
-                                        NOCONStant      ///
-                                ]                       //
-                
-                local varlist_`i' `anything'
-                local nocons`i' `noconstant'
-                
-                // baseline
-                if "`noorthog'"==""     local orth orthog
-                if "`time'"==""         local log log
-                
-		local rcsbase`i' rcs(_t, `df' `knots' `orth' `log' event)
-                
-                // tvcs
-                if "`tvc'"!="" {
-                        if "`dftvc'"=="" {
-				di as error "dftvc() required"
-				exit 198
-			}
-			
-                        local tvclog 
-			if "`tvctime'"=="" {
-				local tvclog log
-			}
-			
-                        local tvcorthog
-			if "`noorthog'"=="" {
-				local tvcorthog orthog
-			}
-			
-			local Ntvc`i' : word count `tvc'
-			local Ntvcdf`i' : word count `dftvc'
-			if `Ntvcdf`i'''>1 & `Ntvcdf`i''!=`Ntvc`i'' {
-				di as error "Number of dftvc() elements do not match tvc()"
-				exit 198
-			}
-			
-			if `Ntvcdf`i''==1 {
-				foreach var in `tvc' {
-					local tvcs`i' `tvcs`i'' `var'#rcs(_t, df(`dftvc') event `tvclog' `tvcorthog')
-				}
-			}
-			else {
-				local ind = 1
-				foreach var in `tvc' {
-					local dftvcv : word `ind' of `dftvc'
-					local tvcs`i' `tvcs`i'' `var'#rcs(_t, df(`dftvcv') event `tvclog' `tvcorthog')
-					local ind = `ind' + 1
-				}
-			}
-                }
-                
-                // additional timescales
-                forvalues j=2/5 {
-                        _merlin_parse_timescale , `time`j''
-                        local multitimes`i' `multitimes`i'' `s(multitimes)'
-                }
-                
-        }
-        
         // parse global opts
         
         local 0 , `glob_op'
-        syntax , `GLOB'
+        syntax [if] [in] ,      INDicator(varname)              ///
+                                [                               ///
+                                        CHINTPoints(passthru)   ///
+                                        FROM(passthru)          ///
+                                        DEBUG                   ///
+                                        *                       ///
+                                ]
+
+        if "`debug'"!="" {
+                local noisily noisily
+        }
+                                
+        global ind `indicator'          //!! fix - add to merlin struct
+        
+        //parse control
+        _parsemodel `cmd_1'
+        local clp1 `"`s(clp)'"'
+        local nocons1 "`s(noconstant)'"
+        local sv_clp1 `"`s(sv_clp)'"'
+        local sv_opts1   `"`s(sv_opts)'"'
+        
+        //parse excess
+        _parsemodel `cmd_2'
+        local clp2 `"`s(clp)'"'
+        local nocons2 "`s(noconstant)'"
         
         // sample
-        tempvar touse
-        mark `touse' `if' `in'
+        if "`if'"!="" {
+                local if if `if' & _st==1 & !missing(`indicator')
+        }
+        else {
+                local if if _st==1 & !missing(`indicator')
+        }
+        local samp `if' `in'
+        
+        //check indicator
+        qui count if `indicator'==0 
+        if `r(N)'==0 {
+                di as error "No control observations"
+                exit 198
+        }
+        qui count if `indicator'==1 
+        if `r(N)'==0 {
+                di as error "No excess observations"
+                exit 198
+        }
         
         //left truncation
-        qui su _t0 if `touse'==1 & _st==1
+        qui su _t0 `samp'
         local hasltrunc = `r(max)' > 0
         if `hasltrunc' {
                 local ltrunc ltruncated(_t0)
         }
         
+        if "`from'"=="" {
+                di ""
+                di as txt "Obtaining starting values:"
+                //starting values
+                tempname init init1 init2
+                di "`sv_clp1'"
+                di "`sv_opts1'"
+                cap `noisily' {
+                        stmerlin `sv_clp1' `samp' & `indicator'==0      ///
+                                , dist(rcs)                             ///
+                                  nogen                                 ///
+                                  `sv_opts1'                            ///
+                                  `nocons1'                             //
+                }
+                if _rc>0 {
+                        di as error "Error in obtaining starting values"
+                        exit `_rc'
+                }
+                mat `init1' = e(b)
+                          
+                tempvar exprate
+                qui predict `exprate' , hazard outcome(1)
+                       
+                cap `noisily' {
+                        stmerlin `clp2' `samp' & `indicator'==1         ///
+                                , dist(exp)                             ///
+                                  nogen                                 ///
+                                  bhazard(`exprate')                    ///
+                                  showmerlin                            ///
+                                  `nocons2'                             //
+                }
+                if _rc>0 {
+                        di as error "Error in obtaining starting values"
+                        exit `_rc'
+                }
+                mat `init2' = e(b)
+                mat `init' = `init1',`init2'
+                local from from(`init')
+        }
+        di "`clp1'"
+        di "`clp2'"
         // Fit
-        
-        merlin 	(_t                                             ///
-                        `varlist1'                              ///
-                        `tvcs1'                                 ///
-                        `multitimes1'                           ///
-                        `rcsbase1'                              ///
+        merlin 	(_t     `clp1'                                  ///
                         ,                                       ///
-                        family(user,    loghf(_stexcess_logh)   ///
-                                        failure(_d)             ///
-                                        `ltrunc'                ///
-                                        )                       ///
+                        family(user,                            ///
+                                loghf(merlin_stexcess_logh)     ///
+                                failure(_d)                     ///
+                                `ltrunc')                       ///
                         timevar(_t)                             ///
                         `nocons1'                               ///
                 )                                               ///
-                (       `varlist2'                              ///
-                        `tvcs2'                                 ///
-                        `multitimes2'                           ///
-                        `rcsbase2'                              ///
+                (       `clp2'                                  ///
                         ,                                       ///
-                        family(null)                            ///
+                        family(null, reffailure(1))             ///
                         timevar(_t)                             ///
-                        noconstant                              ///
+                        `nocons2'                               ///
                 )                                               ///
-                if _st==1                                       ///
-                `from' 						///
-                `debug'						///
-                `level' 					///
-                `nolog'						///
-                `evaltype'					///
-                `mlopts'					//
-
-        
-        
+                `samp'                                          ///
+                ,                                               ///
+                mordred nogen                                   ///
+                indicator(`indicator')                          ///
+                `from'                                          ///
+                `chintpoints'                                   ///
+                `options'					//
+                
+        ereturn local predictnotok mu 
 
 end
 
-program Replay
-	merlin `0'
+program _parsemodel, sclass
+        syntax [anything] ,                             ///
+                        [                               ///
+                                DF(passthru)	        ///
+                                KNOTS(passthru)	        ///
+                                NOORTHog	        ///
+                                TIME                    ///
+                                                        ///
+                                TVC(varlist)	        ///
+                                DFTvc(numlist)	        ///
+                                TVCTIME		        ///
+                                                        ///
+                                TIME2(string)	        ///
+                                TIME3(string)	        ///
+                                TIME4(string)	        ///
+                                TIME5(string)	        ///
+                                NOCONStant              ///
+                        ]                               //
+        
+        local varlist `"`anything'"'
+        local nocons `noconstant'
+        
+        sreturn local sv_clp `"`varlist'"'
+        local sv_opts `"`df' `knots' `noorthog' `time'"'
+        local sv_opts `"`sv_opts' tvc(`tvc') dftvc(`dftvc') `tvctime'"'
+        forvalues i=2/5 {
+                local sv_opts `"`sv_opts' time`i'(`time`i'')"'
+        }
+        sreturn local sv_opts `"`sv_opts'"'
+        
+        // baseline
+        if "`noorthog'"==""     local orth orthog
+        if "`time'"==""         local log log
+        
+        local rcsbase rcs(_t, `df' `knots' `orth' `log' event)
+        
+        // tvcs
+        if "`tvc'"!="" {
+                if "`dftvc'"=="" {
+                        di as error "dftvc() required"
+                        exit 198
+                }
+                
+                local tvclog 
+                if "`tvctime'"=="" {
+                        local tvclog log
+                }
+                
+                local tvcorthog
+                if "`noorthog'"=="" {
+                        local tvcorthog orthog
+                }
+                
+                local Ntvc : word count `tvc'
+                local Ntvcdf : word count `dftvc'
+                if `Ntvcdf''>1 & `Ntvcdf'!=`Ntvc' {
+                        di as error "Number of dftvc() elements do not match tvc()"
+                        exit 198
+                }
+                
+                if `Ntvcdf'==1 {
+                        foreach var in `tvc' {
+                                local tvcs `tvcs' `var'#rcs(_t, df(`dftvc') event `tvclog' `tvcorthog')
+                        }
+                }
+                else {
+                        local ind = 1
+                        foreach var in `tvc' {
+                                local dftvcv : word `ind' of `dftvc'
+                                local tvcs `tvcs' `var'#rcs(_t, df(`dftvcv') event `tvclog' `tvcorthog')
+                                local ind = `ind' + 1
+                        }
+                }
+        }
+        
+        // additional timescales
+        forvalues j=2/5 {
+                if "`time`j''"!="" {
+                        _merlin_parse_timescale , `time`j''
+                        local multitimes `multitimes' `s(multitimes)'
+                }
+        }
+        
+        sreturn local clp `varlist' `tvcs' `multitimes' `rcsbase'
+        sreturn local noconstant `noconstant'
 end
 
 program _merlin_parse_timescale, sclass
@@ -189,11 +264,11 @@ program _merlin_parse_timescale, sclass
         if "`df'"=="" {
                 local knotsopt knots(`knots')
                 local Ndf = `: word count `knots'' - 1 
-                local event event
         }
         else {
                 local knotsopt df(`df')
                 local Ndf = `df'
+                local event event
         }
         
         local multitimes rcs(_t, `offset' `moffset' `event' `knotsopt' `orthog' `log')
@@ -224,16 +299,9 @@ program _merlin_parse_timescale, sclass
 
         }
         
-        sreturn local timescale
+        sreturn local multitimes `multitimes'
 end
 
-version 17
-
-mata:
-real matrix _stexcess_logh(transmorphic gml, real matrix t)
-{
-	haz_expect = exp(merlin_util_xzb(gml,t))
-        haz_excess = exp(merlin_util_xzb_mod(gml,2))
-	return(log(haz_expect :+ haz_excess))
-}
+program Replay
+	merlin `0'
 end
