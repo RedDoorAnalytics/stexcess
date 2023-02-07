@@ -1,7 +1,8 @@
 v 3
-d nnplot: create a plot of an artificial neural network
+d stexcess: fit excess hazard models
 d Author: Michael J. Crowther
-d Distribution-Date: 20220203
-f nnplot/nnplot.ado
-f nnplot/nnplot.sthlp
+d Distribution-Date: 20230207
+f ado/stexcess.ado
+f help/stexcess.sthlp
+f help/stexcess_postestimation.sthlp
 e
