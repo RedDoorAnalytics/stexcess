@@ -15,7 +15,7 @@ hazard model with a modelled expected rate{p_end}
 {title:Syntax}
 
 {p 8 12 2}
-{cmd:stexcess} {bf:(}{it:control_model}{bf:)}{bf:(}{it:excess_model}{bf:)} 
+{cmd:stexcess} {bf:(}{it:reference_model}{bf:)}{bf:(}{it:excess_model}{bf:)} 
 {ifin} , 
 {bf:indicator}({varname}) [{bf:,} {help stexcess##options:{it:options}}]
 

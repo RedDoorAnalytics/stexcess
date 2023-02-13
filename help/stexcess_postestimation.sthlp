@@ -26,7 +26,6 @@ Syntax for predictions following a {helpb stexcess} model
 {synoptset 22 tabbed}{...}
 {synopthdr:statistic}
 {synoptline}
-{synopt :{opt eta}}expected value of the linear predictor{p_end}
 {synopt :{opt surv:ival}}survivor function{p_end}
 {synopt :{opt cif}}cumulative incidence function{p_end}
 {synopt :{opt h:azard}}hazard function{p_end}
@@ -34,12 +33,10 @@ Syntax for predictions following a {helpb stexcess} model
 {synopt :{opt logch:azard}}log cumulative hazard function{p_end}
 {synopt :{opt rmst}}restricted mean survival time, within (0,{it:t}]{p_end}
 {synopt :{opt timel:ost}}time lost due to an event, within (0,{it:t}]{p_end}
-{synopt :{opt etadiff:erence}}difference in expected value of complex predictor{p_end}
 {synopt :{opt hdiff:erence}}difference in hazard functions{p_end}
 {synopt :{opt sdiff:erence}}difference in survival functions{p_end}
 {synopt :{opt cifdiff:erence}}difference in cumulative incidence functions{p_end}
 {synopt :{opt rmstdiff:erence}}difference in restricted mean survival functions{p_end}
-{synopt :{opt etar:atio}}ratio of expected value of complex predictor{p_end}
 {synopt :{opt hr:atio}}ratio of hazard functions{p_end}
 {synopt :{opt sr:atio}}ratio of survival functions{p_end}
 {synopt :{opt cifr:atio}}ratio of cumulative incidence functions{p_end}
@@ -56,7 +53,6 @@ Syntax for predictions following a {helpb stexcess} model
 {synopt :{opt at1(at_spec)}}specify covariate values for prediction; for use with difference and ratio predictions{p_end}
 {synopt :{opt at2(at_spec)}}specify covariate values for prediction; for use with difference and ratio predictions{p_end}
 {synopt :{opt ci}}calculate confidence intervals{p_end}
-{synopt :{opt reps(#)}}number of bootstrap samples for {cmd:ci}s; see details{p_end}
 {synopt :{cmd:timevar(}{varname}{cmd:)}}calculate predictions at specified time-points{p_end}
 {synoptline}
 {p2colreset}{...}
@@ -67,7 +63,7 @@ Syntax for predictions following a {helpb stexcess} model
 
 {pstd}
 {cmd:predict} is a standard postestimation command of Stata.
-This entry concerns use of {cmd:predict} after {helpb stmerlin}.
+This entry concerns use of {cmd:predict} after {helpb stexcess}.
 
 {pstd}
 {cmd:predict} after {cmd:stexcess} creates new variables containing
@@ -79,9 +75,6 @@ linear predictions of observed response variables, or other such functions.
 {title:Options}
 
 {dlgtab:Main}
-
-{phang} 
-{cmd:eta} calculates the fitted linear prediction.
 
 {phang} 
 {cmd:survival} calculates the survival function. 
@@ -108,10 +101,6 @@ This is 1 - survival.
 This is the integral of the {cmd:cif} between (0,{it:t}].
 
 {phang} 
-{cmd:etadifference} calculates the difference in the expected value of the complex predictor, 
-across the covariate patterns specified in {cmd:at1()} and {cmd:at2()}. 
-
-{phang} 
 {cmd:hdifference} calculates the difference in hazard function at time {it:t}, where {it:t} is the time at which predictions are made, 
 across the covariate patterns specified in {cmd:at1()} and {cmd:at2()}. 
 
@@ -125,10 +114,6 @@ across the covariate patterns specified in {cmd:at1()} and {cmd:at2()}.
 
 {phang} 
 {cmd:rmstdifference} calculates the difference in restricted mean survival time at time {it:t}, where {it:t} is the time at which predictions are made, 
-across the covariate patterns specified in {cmd:at1()} and {cmd:at2()}. 
-
-{phang} 
-{cmd:etaratio} calculates the ratio of the expected value of the complex predictor, 
 across the covariate patterns specified in {cmd:at1()} and {cmd:at2()}. 
 
 {phang} 
@@ -175,10 +160,6 @@ in which case bootstrapping is used. The calculated confidence intervals are gen
 and {it:newvarname_uci}.
 
 {phang}
-{cmd:reps(#)} specifies the number of bootstrap samples to use when calculating confidence intervals for a prediction 
-from a {cmd:family(cox)} model. Default is {cmd:reps(100)}.
-
-{phang}
 {cmd:timevar(}{varname}{cmd:)} calculate predictions at specified time-points. 
 For survival models, the default is to calculate predictions at the response times. 
 For a {cmd:merlin} model where a {cmd:timevar()} was specified, then the default will use the original 
@@ -200,6 +181,8 @@ Out-of-sample prediction is allowed for all {cmd:predict} options.
 {cmd:    . stset stime, failure(died)}
 {cmd:    . stmerlin (age sex, df(3))(age sex, df(2)), indicator(cancer)}
 
-{phang}Predict the survival function:{p_end}
-{cmd:    . predict s1, survival}
+{phang}Predict the survival function for the control group:{p_end}
+{cmd:    . predict s1, survival at(cancer 0)}
 
+{phang}Predict the survival function for the cancer group:{p_end}
+{cmd:    . predict s2, survival at(cancer 1)}
