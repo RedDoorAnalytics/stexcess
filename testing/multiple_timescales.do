@@ -27,8 +27,9 @@ stset stime, f(died)
 stexcess (, df(1) noorthog time2(df(1) offset(age) time noorthog))      ///
          (age, df(1) noorthog)    ///
          ,                        ///
-         indicator(cancer) //chintpoints(150)
+         indicator(cancer) 
          
 predict s1, survival
-predict s2, survival at(cancer 0 age 45)
-predict s3, survival at(cancer 1 age 45)
+predict s2, relsurv at(cancer 0 age 45)
+
+predict s3, sratio at1(cancer 1 age 45) at2(cancer 0 age 45)

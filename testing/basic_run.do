@@ -21,7 +21,7 @@ mata mata clear
 
 clear 
 set seed 725
-set obs 50000
+set obs 5000
 gen id1 = _n
 gen cancer = runiform()>0.5
 gen age = rnormal(0,5)
@@ -35,16 +35,22 @@ survsim stime died , 	hazard(exp(log(0.01) :+0.001 :* age :+          ///
 stset stime, f(died)
 
 // - sync indicator in merlin struct                                    DONE
-// - replay sync
-// - e(predictnotok) ...
-// - predict help file
+// - replay sync                                                        DONE
+// - e(predictnotok) ...                                                DONE
+// - equation names in output                                           DONE
+// - predict help file                                                  DONE
 // - multiple timescale sync & example                                  DONE
+// - 
       
-stexcess (age, df(1) noorthog)                      ///
-         (age, df(1) noorthog)                   ///
+stexcess (age, df(1) noorthog)          ///
+         (age, df(1) noorthog)          ///
          ,                              ///
          indicator(cancer)
          
+stexcess
+         
+// predict test1, mu
+         
 predict s1, survival
-predict s2, survival at(cancer 0 age 45)
+predict s2, survival at(cancer 0) //standardise
 predict s3, survival at(cancer 1 age 45)
