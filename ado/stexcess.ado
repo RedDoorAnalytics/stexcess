@@ -1,13 +1,13 @@
-*! version 1.0.0  ?????2022
+*! version 1.0.0  ?????2023
 
 program define stexcess, eclass sortpreserve properties(st)
         version 17
         local copy0 `0'
 	syntax [anything] [if] [in] , [*]
-	if replay() & "`options'"=="" {
-		if (`"`e(cmd2)'"'!="stexcess") error 301
-		Replay `copy0'
-		exit
+	if replay() {
+                if (`"`e(cmd2)'"'!="stexcess") error 301
+                Replay `copy0'
+                exit
 	}
 	else Estimate `copy0'
 	ereturn local cmd2 stexcess
@@ -90,8 +90,6 @@ program Estimate, eclass
                 di as txt "Obtaining starting values:"
                 //starting values
                 tempname init init1 init2
-                di "`sv_clp1'"
-                di "`sv_opts1'"
                 cap `noisily' {
                         stmerlin `sv_clp1' `samp' & `indicator'==0      ///
                                 , dist(rcs)                             ///
@@ -124,8 +122,7 @@ program Estimate, eclass
                 mat `init' = `init1',`init2'
                 local from from(`init')
         }
-        di "`clp1'"
-        di "`clp2'"
+        
         // Fit
         merlin 	(_t     `clp1'                                  ///
                         ,                                       ///
@@ -146,11 +143,14 @@ program Estimate, eclass
                 ,                                               ///
                 mordred nogen                                   ///
                 indicator(`indicator')                          ///
+                modellabels("reference excess")                 ///
                 `from'                                          ///
                 `chintpoints'                                   ///
                 `options'					//
                 
-        ereturn local predictnotok mu 
+        ereturn local predictnotok mu eta mudifference ///
+                        etadifference etaratio muratio
+        
 
 end
 
