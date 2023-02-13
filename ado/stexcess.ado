@@ -1,4 +1,4 @@
-*! version 1.0.0  ?????2023
+*! version 1.0.0  13feb2023
 
 program define stexcess, eclass sortpreserve properties(st)
         version 17
