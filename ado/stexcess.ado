@@ -19,6 +19,12 @@ program Estimate, eclass
         
         st_is 2 analysis
         
+        cap which merlin
+        if _rc>0 {
+                di as txt "The {bf:merlin} package is required; type {bf:ssc install merlin}"
+                exit 198
+        }
+        
         _parse expand cmd glob : 0
         if `cmd_n'>2 | `cmd_n'<2 {
                 di as error "control and excess models required"
