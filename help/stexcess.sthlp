@@ -60,6 +60,8 @@ quadrature points used when calculating the cumulative hazard function{p_end}
 {cmd:rp} or {cmd:rcs} models; see details{p_end}
 {synopt :{opt knots(knots_list)}}knot locations for the baseline function 
 with {cmd:rp} or {cmd:rcs} models; see details{p_end}
+{synopt :{opth off:set(varname)}}to add before the baseline spline function is calculated{p_end}
+{synopt :{opth moff:set(varname)}}adds the negative of {it:varname} before the baseline spline function is calculated{p_end}
 {synopt :{opth tvc(varlist)}}time-dependent effects{p_end}
 {synopt :{opth dftvc(numlist)}}degrees of freedom for each time-dependent 
 effect{p_end}
@@ -167,6 +169,12 @@ knots. Knots should be specified in increasing order.
 {phang2}defines the knot locations (cut-points) of the baseline function for {cmd:distribution(pwexponential)}. Knots should 
 be specified in increasing order.
 
+{phang}
+{opt offset(varname)} defines the offset to be added to {cmd:_t} to define the baseline timescale.
+
+{phang}
+{opt moffset(varname)} defines the offset to be taken away ("minused") from {cmd:_t} to define the baseline timescale.
+
 {phang}{opt tvc(varlist)} specifies the variables that have time-dependent effects. Time-dependent effects are fitted 
 using restricted cubic splines of time or log time (the default). The degrees of freedom are specified using the 
 {cmd:dftvc()} option. Note, {cmd:tvc()}s are not supported with generalised gamma, log normal or log logistic models.
@@ -183,12 +191,10 @@ the default of log time.
 {dlgtab:Multiple timescales}
 
 {phang}
-{opt offset(varname)} defines the offset to be added to {cmd:_t} to define the additional timescale. If time since diagnosis 
-was the main timescale, and you wish to add attained age as a second timescale, the {cmd:offset()} would contain age at diagnosis.
+{opt offset(varname)} defines the offset to be added to {cmd:_t} to define the additional timescale. If time since diagnosis was the main timescale, and you wish to add attained age as a second timescale, the {cmd:offset()} would contain age at diagnosis.
 
 {phang}
-{opt moffset(varname)} defines the offset to be taken away ("minused") from {cmd:_t} to define the additional timescale, i.e. to 
-reset the clock.
+{opt moffset(varname)} defines the offset to be taken away ("minused") from {cmd:_t} to define the additional timescale, i.e. to reset the clock.
 
 {phang}{opt df(#)} degrees of freedom for the additional timescale function, i.e. number of restricted cubic 
 spline terms. Internal knots are placed at centiles of the event times. Boundary knots are placed at the minimum and maximum event times.

@@ -1,4 +1,4 @@
-*! version 1.0.0  13feb2023
+*! version 1.0.1  15aug2023
 
 program define stexcess, eclass sortpreserve properties(st)
         version 17
@@ -97,10 +97,9 @@ program Estimate, eclass
                 //starting values
                 tempname init init1 init2
                 cap `noisily' {
-                        stmerlin `sv_clp1' `samp' & `indicator'==0      ///
-                                , dist(rcs)                             ///
+                        stmerlin `clp1' `samp' & `indicator'==0      	///
+                                , dist(exp)                             ///
                                   nogen                                 ///
-                                  `sv_opts1'                            ///
                                   `nocons1'                             //
                 }
                 if _rc>0 {
@@ -167,6 +166,9 @@ program _parsemodel, sclass
                                 KNOTS(passthru)	        ///
                                 NOORTHog	        ///
                                 TIME                    ///
+							///
+				OFFset(passthru)	///
+				MOFFset(passthru)	///
                                                         ///
                                 TVC(varlist)	        ///
                                 DFTvc(numlist)	        ///
@@ -183,7 +185,7 @@ program _parsemodel, sclass
         local nocons `noconstant'
         
         sreturn local sv_clp `"`varlist'"'
-        local sv_opts `"`df' `knots' `noorthog' `time'"'
+        local sv_opts `"`df' `knots' `noorthog' `time' `offset' `moffset'"'
         local sv_opts `"`sv_opts' tvc(`tvc') dftvc(`dftvc') `tvctime'"'
         forvalues i=2/5 {
                 local sv_opts `"`sv_opts' time`i'(`time`i'')"'
@@ -194,7 +196,8 @@ program _parsemodel, sclass
         if "`noorthog'"==""     local orth orthog
         if "`time'"==""         local log log
         
-        local rcsbase rcs(_t, `df' `knots' `orth' `log' event)
+        local rcsbase rcs(_t, `df' `knots' `orth' `log' ///
+			`offset' `moffset' event)
         
         // tvcs
         if "`tvc'"!="" {

@@ -1,5 +1,5 @@
 //local drive Z:/
-local drive /Users/Michael/Documents
+local drive /Users/Michael
 cd "`drive'/merlin"
 adopath ++ "`drive'/merlin"
 adopath ++ "`drive'/merlin/merlin"
@@ -9,7 +9,7 @@ clear all
 tr:do ./build/buildmlib.do
 mata mata clear
 
-local drive /Users/Michael/Documents/reddooranalytics/products/stexcess
+local drive /Users/michael/My Drive/products/stexcess
 
 cd "`drive'"
 adopath ++ "`drive'"
@@ -21,10 +21,11 @@ mata mata clear
 
 clear 
 set seed 725
-set obs 5000
+set obs 100000
 gen id1 = _n
 gen cancer = runiform()>0.5
 gen age = rnormal(0,5)
+gen tes0 = 0
 
 survsim stime died , 	hazard(exp(log(0.01) :+0.001 :* age :+          ///
                                 log({t})) :+ cancer :* exp(log(0.02) :+ ///
@@ -43,9 +44,9 @@ stset stime, f(died)
 // - 
       
 stexcess (age, df(1) noorthog)          ///
-         (age, df(1) noorthog)          ///
+         (age, df(1) noorthog moffset(tes0))          ///
          ,                              ///
-         indicator(cancer)
+         indicator(cancer) debug
          
 stexcess
          
