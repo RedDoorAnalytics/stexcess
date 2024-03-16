@@ -1,4 +1,12 @@
-*! version 1.0.1  15aug2023
+*! version 1.1.0  16mar2024
+
+/*
+History
+v1.1.0
+- new evaluator calculatign full log likelihood
+- analytics scores now used
+*/
+
 
 program define stexcess, eclass sortpreserve properties(st)
         version 17
@@ -42,12 +50,16 @@ program Estimate, eclass
                                         CHINTPoints(passthru)   ///
                                         FROM(passthru)          ///
                                         DEBUG                   ///
+					EVALtype(passthru)	///
                                         *                       ///
                                 ]
 
         if "`debug'"!="" {
                 local noisily noisily
         }
+	if "`evaltype'"=="" {
+		local evaltype evaltype(gf1)
+	}
                                 
         global ind `indicator'          //!! fix - add to merlin struct
         
@@ -132,7 +144,7 @@ program Estimate, eclass
         merlin 	(_t     `clp1'                                  ///
                         ,                                       ///
                         family(user,                            ///
-                                loghf(merlin_stexcess_logh)     ///
+                                llf(merlin_stexcess_logl)     	///
                                 failure(_d)                     ///
                                 `ltrunc')                       ///
                         timevar(_t)                             ///
@@ -151,6 +163,7 @@ program Estimate, eclass
                 modellabels("reference excess")                 ///
                 `from'                                          ///
                 `chintpoints'                                   ///
+		`evaltype'					///
                 `options'					//
                 
         ereturn local predictnotok mu eta mudifference ///
