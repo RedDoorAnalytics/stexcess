@@ -1,7 +1,9 @@
-*! version 1.1.0  16mar2024
+*! version 1.1.1  16may2024
 
 /*
 History
+v1.1.1
+- bug fix; predictions re-synced
 v1.1.0
 - new evaluator calculatign full log likelihood
 - analytics scores now used

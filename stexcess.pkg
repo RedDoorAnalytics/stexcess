@@ -1,7 +1,7 @@
 v 3
 d stexcess: fit excess hazard models
 d Author: Michael J. Crowther
-d Distribution-Date: 20240316
+d Distribution-Date: 20240516
 f ado/stexcess.ado
 f help/stexcess.sthlp
 f help/stexcess_postestimation.sthlp
