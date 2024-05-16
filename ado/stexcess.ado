@@ -168,6 +168,8 @@ program Estimate, eclass
                 
         ereturn local predictnotok mu eta mudifference ///
                         etadifference etaratio muratio
+	ereturn local hfunction1 merlin_p_stexcess_h
+	ereturn local chfunction1 merlin_p_stexcess_ch 
         
 
 end

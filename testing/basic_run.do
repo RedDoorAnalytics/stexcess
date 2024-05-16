@@ -35,31 +35,31 @@ survsim stime died , 	hazard(exp(log(0.01) :+0.01 :* age :+          ///
 stset stime, f(died)
 
 timer clear
-timer on 1
-merlin (_t age rcs(_t, df(1) log event) , 	///
-	family(user, loghf(merlin_stexcess_logh) ///
-		failure(_d)) timevar(_t)) 		///
-       ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
-	timevar(_t)) if _st==1 & !missing(cancer) , 	///
-		mordred nogen indicator(cancer)
-timer off 1
-timer on 2
-merlin (_t age rcs(_t, df(1) log event) , 	///
-	family(user, llf(merlin_stexcess_logl) ///
-		failure(_d)) timevar(_t)) 		///
-       ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
-	timevar(_t)) if _st==1 & !missing(cancer) , 	///
-		mordred nogen indicator(cancer) evaltype(gf0) 
-timer off 2	
-timer on 3
-merlin (_t age rcs(_t, df(1) log event) , 	///
-	family(user, llf(merlin_stexcess_logl) ///
-		failure(_d)) timevar(_t)) 		///
-       ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
-	timevar(_t)) if _st==1 & !missing(cancer) , 	///
-		mordred nogen indicator(cancer) evaltype(gf1) 
-timer off 3
-timer list
+// timer on 1
+// merlin (_t age rcs(_t, df(1) log event) , 	///
+// 	family(user, loghf(merlin_stexcess_logh) ///
+// 		failure(_d)) timevar(_t)) 		///
+//        ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
+// 	timevar(_t)) if _st==1 & !missing(cancer) , 	///
+// 		mordred nogen indicator(cancer)
+// timer off 1
+// timer on 2
+// merlin (_t age rcs(_t, df(1) log event) , 	///
+// 	family(user, llf(merlin_stexcess_logl) ///
+// 		failure(_d)) timevar(_t)) 		///
+//        ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
+// 	timevar(_t)) if _st==1 & !missing(cancer) , 	///
+// 		mordred nogen indicator(cancer) evaltype(gf0) 
+// timer off 2	
+// timer on 3
+// merlin (_t age rcs(_t, df(1) log event) , 	///
+// 	family(user, llf(merlin_stexcess_logl) ///
+// 		failure(_d)) timevar(_t)) 		///
+//        ( rcs(_t, df(1)   log   event) , family(null, reffailure(1)) ///
+// 	timevar(_t)) if _st==1 & !missing(cancer) , 	///
+// 		mordred nogen indicator(cancer) evaltype(gf1) 
+// timer off 3
+// timer list
 
 /*
 . timer list
@@ -68,7 +68,7 @@ timer list
    3:      7.13 /        1 =       7.1330
 */
 
-exit 
+// exit 
 // - sync indicator in merlin struct                                    DONE
 // - replay sync                                                        DONE
 // - e(predictnotok) ...                                                DONE
@@ -87,8 +87,9 @@ stexcess
 // predict test1, mu
 cap drop time
 range time 0 5 100
-predict s1, survival at(cancer 0) timevar(time)
+predict s1, survival at(cancer 0) timevar(time) 
 predict s2, survival at(cancer 1) timevar(time)
-
+predict h1, hazard at(cancer 0) timevar(time) 
+predict h2, hazard at(cancer 1) timevar(time)
 
 scatter s1 s2 time
