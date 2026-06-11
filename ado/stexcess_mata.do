@@ -38,8 +38,12 @@ struct _stx_ts {                  // one timescale of a component
 }
 
 struct _stx_comp {                // one hazard component (reference or excess)
-    string rowvector covnames     // fixed covariates, design order
+    string rowvector covnames     // included covariate terms, design order
+    string rowvector covfull      // all terms incl. base/omitted (display)
+    real rowvector covincl       // 1 if covfull[j] is estimated
     string rowvector datnames     // covnames + tvc-only variables (data cols)
+    string rowvector datvars      // variables holding datnames' values (fv
+                                  // terms resolve to fvrevar tempvars)
     struct _stx_ts rowvector ts   // ts[1] is the main (baseline) timescale
     real scalar cons              // 1 if _cons included
 }
@@ -47,8 +51,10 @@ struct _stx_comp {                // one hazard component (reference or excess)
 struct _stx_model {               // fitted model, stored for postestimation
     struct _stx_comp scalar ref, exc
     string scalar indvar          // excess indicator variable name
-    real rowvector b
-    real matrix V
+    real rowvector b              // included parameters only
+    real matrix V                 //   "
+    real rowvector bsel           // their column positions within e(b),
+                                  // whose layout includes base/omitted terms
     real scalar pr                // number of reference-equation parameters
 }
 
@@ -243,8 +249,8 @@ string scalar _stx_names(struct _stx_comp scalar C, string scalar eq)
     real scalar s, j, i
 
     out = ""
-    for (j = 1; j <= cols(C.covnames); j++) {
-        out = out + " " + eq + ":" + C.covnames[j]
+    for (j = 1; j <= cols(C.covfull); j++) {
+        out = out + " " + eq + ":" + C.covfull[j]
     }
     for (j = 1; j <= cols(C.ts[1].tvcnames); j++) {
         for (i = 1; i <= rows(C.ts[1].tvcspecs[j].knots) - 1; i++) {
@@ -284,6 +290,28 @@ real scalar _stx_npar(struct _stx_comp scalar C)
         }
     }
     return(p)
+}
+
+// number of parameters of one component in the FULL e(b) layout, which
+// also carries base/omitted factor-variable terms with zero coefficients
+real scalar _stx_kfull(struct _stx_comp scalar C)
+{
+    return(_stx_npar(C) - cols(C.covnames) + cols(C.covfull))
+}
+
+// full-layout column positions of the component's included parameters
+real rowvector _stx_bsel(struct _stx_comp scalar C, real scalar off)
+{
+    real rowvector sel
+    real scalar j, prest
+
+    sel = J(1, 0, .)
+    for (j = 1; j <= cols(C.covfull); j++) {
+        if (C.covincl[j]) sel = (sel, off + j)
+    }
+    prest = _stx_npar(C) - cols(C.covnames)
+    if (prest) sel = (sel, off :+ cols(C.covfull) :+ (1..prest))
+    return(sel)
 }
 
 // event design + record-major stacked quadrature design over (t0, t]
@@ -329,36 +357,23 @@ real matrix _stx_qsum(real colvector e, real matrix Wq, real scalar G)
 // offsets and component specs (driven by the .ado macro contract)
 // ========================================================================= //
 
-// at()-style override: value of _stx_<pfx>_<name>, missing if not set
-real scalar _stx_atval(string scalar pfx, string scalar name)
-{
-    if (pfx == "") return(.)
-    return(strtoreal(st_local("_stx_" + pfx + "_" + name)))
-}
-
-// combined offset (off - moff) over touse rows; overrides honoured when a
-// prediction at()-prefix is given
+// combined offset (off - moff) over touse rows; prediction-time at()
+// overrides are applied by the wrapper as data replacements, so values are
+// always read straight from the variables
 real colvector _stx_offdata(string scalar offvar, string scalar moffvar,
-    string scalar touse, real scalar n, string scalar pfx)
+    string scalar touse, real scalar n)
 {
     real colvector off
-    real scalar v
 
     off = J(n, 1, 0)
-    if (offvar != "") {
-        v = _stx_atval(pfx, offvar)
-        off = off + (v < . ? J(n, 1, v) : st_data(., offvar, touse))
-    }
-    if (moffvar != "") {
-        v = _stx_atval(pfx, moffvar)
-        off = off - (v < . ? J(n, 1, v) : st_data(., moffvar, touse))
-    }
+    if (offvar != "")  off = off + st_data(., offvar, touse)
+    if (moffvar != "") off = off - st_data(., moffvar, touse)
     return(off)
 }
 
 // per-timescale offset matrix for one component over touse rows
 real matrix _stx_offmat(struct _stx_comp scalar C, string scalar touse,
-    real scalar n, string scalar pfx)
+    real scalar n)
 {
     real matrix OFF
     real scalar s
@@ -367,7 +382,7 @@ real matrix _stx_offmat(struct _stx_comp scalar C, string scalar touse,
     for (s = 1; s <= cols(C.ts); s++) {
         if (C.ts[s].offvar != "" | C.ts[s].moffvar != "") {
             OFF[., s] = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar,
-                touse, n, pfx)
+                touse, n)
         }
     }
     return(OFF)
@@ -391,7 +406,17 @@ void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
 
     n = rows(t)
     C.covnames = tokens(st_local("_stx_" + tag + "vars"))
+    C.covfull  = tokens(st_local("_stx_" + tag + "covfull"))
+    C.covincl  = strtoreal(tokens(st_local("_stx_" + tag + "covincl")))
+    if (!cols(C.covfull)) {                   // plain-variable fallback
+        C.covfull = C.covnames
+        C.covincl = J(1, cols(C.covnames), 1)
+    }
     C.datnames = C.covnames
+    // fv terms resolve to fvrevar tempvars supplied by the wrapper;
+    // tvc-only variables (appended below) hold their own values
+    C.datvars = tokens(st_local("_stx_" + tag + "covmap"))
+    if (!cols(C.datvars)) C.datvars = C.covnames
     C.cons = st_local("_stx_" + tag + "_cons") != "0"
     tsnums = tokens(st_local("_stx_" + tag + "_tslist"))
     C.ts = J(1, cols(tsnums), _stx_ts())
@@ -405,7 +430,7 @@ void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
         C.ts[s].moffvar = st_local(p + "moff")
         C.ts[s].base.logs = st_local(p + "log") != "0"
 
-        off = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar, touse, n, "")
+        off = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar, touse, n)
         t_ev = select(t + off, evmask)
         kn_s = st_local(p + "knots")
         df = strtoreal(st_local(p + "df"))
@@ -434,6 +459,7 @@ void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
                     : J(0, 0, .))
                 if (!anyof(C.datnames, C.ts[s].tvcnames[j])) {
                     C.datnames = (C.datnames, C.ts[s].tvcnames[j])
+                    C.datvars  = (C.datvars,  C.ts[s].tvcnames[j])
                 }
             }
         }
@@ -454,7 +480,7 @@ void _stx_checkts(struct _stx_comp scalar C, string scalar touse,
         }
         if (!needpos) continue
         if (C.ts[s].offvar == "" & C.ts[s].moffvar == "") continue
-        off = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar, touse, rows(t), "")
+        off = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar, touse, rows(t))
         if (missing(off)) {
             _stx_error(459, what + ": offset variables contain missing values")
         }
@@ -603,13 +629,13 @@ struct _stx_model scalar _stx_usemodel()
 
     M = _stx_getmodel()
     eb = st_matrix("e(b)")
-    // two steps: Mata | does not short-circuit, and mreldif() requires
-    // conformable arguments
-    if (cols(eb) != cols(M.b)) {
+    // two steps: Mata | does not short-circuit, and subscripting requires
+    // the columns to exist
+    if (cols(eb) < max(M.bsel)) {
         _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
-    if (mreldif(eb, M.b) > 1e-12) {
+    if (mreldif(eb[M.bsel], M.b) > 1e-12) {
         _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
@@ -626,13 +652,15 @@ void _stx_fit()
     struct _stx_model scalar M
     transmorphic S, S2
     string scalar touse, fromname
-    string rowvector atvars
     real colvector t, t0, d, ind, nd, w, cm, pm, eC, eR, eE, hr, he, pi, w2
     real matrix Xr, Xe, OFFr, OFFe, glm, Dev, Wq, V, A, B, Sc, Sp, Ainv
     real matrix A11, A21, A22
     real rowvector b0, b
     real colvector cw
-    real scalar n, G, k, rate, twostage, ll, conv, iter, pe, s, j, trace
+    real scalar n, G, k, kfull, rate, twostage, ll, conv, iter, pe, s, j
+    real scalar trace
+    real rowvector bf
+    real matrix Vf
 
     touse = st_local("_stx_touse")
     t   = st_data(., st_local("_stx_t"), touse)
@@ -669,27 +697,16 @@ void _stx_fit()
             invtokens(strtrim(strofreal(M.exc.ts[s].base.knots', "%21.0g"))))
     }
 
-    // at()-able names for predict-time validation
-    atvars = (M.ref.datnames, M.exc.datnames, st_local("_stx_ind"))
-    for (s = 1; s <= cols(M.ref.ts); s++) {
-        if (M.ref.ts[s].offvar != "")  atvars = (atvars, M.ref.ts[s].offvar)
-        if (M.ref.ts[s].moffvar != "") atvars = (atvars, M.ref.ts[s].moffvar)
-    }
-    for (s = 1; s <= cols(M.exc.ts); s++) {
-        if (M.exc.ts[s].offvar != "")  atvars = (atvars, M.exc.ts[s].offvar)
-        if (M.exc.ts[s].moffvar != "") atvars = (atvars, M.exc.ts[s].moffvar)
-    }
-    st_local("_stx_atvars", invtokens(uniqrows(atvars')'))
 
     G = strtoreal(st_local("_stx_nnodes"))
     glm = _stx_gl(G)
     nd = glm[., 1]
     w  = glm[., 2]
 
-    Xr = (cols(M.ref.datnames) ? st_data(., M.ref.datnames, touse) : J(n, 0, 0))
-    Xe = (cols(M.exc.datnames) ? st_data(., M.exc.datnames, touse) : J(n, 0, 0))
-    OFFr = _stx_offmat(M.ref, touse, n, "")
-    OFFe = _stx_offmat(M.exc, touse, n, "")
+    Xr = (cols(M.ref.datvars) ? st_data(., M.ref.datvars, touse) : J(n, 0, 0))
+    Xe = (cols(M.exc.datvars) ? st_data(., M.exc.datvars, touse) : J(n, 0, 0))
+    OFFr = _stx_offmat(M.ref, touse, n)
+    OFFe = _stx_offmat(M.exc, touse, n)
 
     // estimation blocks
     Dev = .
@@ -735,13 +752,17 @@ void _stx_fit()
     if (M.ref.cons) b0[D.pr] = ln(rate)
     rate = max((sum(select(d, pm)) / sum(select(t - t0, pm)), 1e-4))
     if (M.exc.cons) b0[k] = ln(0.5 * rate)
+    // bsel maps the included parameters into the full e(b) layout (which
+    // also carries base/omitted factor-variable terms as zero coefficients)
+    M.bsel = (_stx_bsel(M.ref, 0), _stx_bsel(M.exc, _stx_kfull(M.ref)))
+    kfull = _stx_kfull(M.ref) + _stx_kfull(M.exc)
     fromname = st_local("_stx_from")
     if (fromname != "") {
-        if (cols(st_matrix(fromname)) != k) {
-            _stx_error(198, "from(): matrix must have " + strofreal(k) +
-                " columns (one per model parameter)")
+        if (cols(st_matrix(fromname)) != kfull) {
+            _stx_error(198, "from(): matrix must have " + strofreal(kfull) +
+                " columns (one per e(b) column)")
         }
-        b0 = st_matrix(fromname)
+        b0 = st_matrix(fromname)[M.bsel]
     }
 
     if (!twostage) {
@@ -803,8 +824,12 @@ void _stx_fit()
     M.V  = V
     _stx_putmodel(M)
 
-    st_matrix(st_local("_stx_bmat"), b)
-    st_matrix(st_local("_stx_Vmat"), V)
+    bf = J(1, kfull, 0)
+    bf[M.bsel] = b
+    Vf = J(kfull, kfull, 0)
+    Vf[M.bsel, M.bsel] = V
+    st_matrix(st_local("_stx_bmat"), bf)
+    st_matrix(st_local("_stx_Vmat"), Vf)
     st_local("_stx_ll",   strofreal(ll, "%21.0g"))
     st_local("_stx_k",    strofreal(k))
     st_local("_stx_conv", strofreal(conv))
@@ -872,44 +897,47 @@ real scalar _stx_needind(string scalar q)
 }
 
 // ========================================================================= //
-// row-based prediction data: observed values with at()/zeros overrides
+// row-based prediction data
 // ========================================================================= //
 
-// one data column over touse: at()-override > zeros > observed values
-real colvector _stx_datcol(string scalar name, string scalar touse,
-    real scalar m, string scalar pfx, real scalar zeros)
+// the wrapper rebuilds factor-variable terms with fvrevar at predict time
+// (so at()/zeros replacements of the underlying variables propagate) and
+// passes the resulting variable maps in _stx_refmap/_stx_excmap
+void _stx_mapinfo()
 {
-    real scalar v
+    struct _stx_model scalar M
 
-    v = _stx_atval(pfx, name)
-    if (v < .) return(J(m, 1, v))
-    if (zeros) return(J(m, 1, 0))
-    if (_st_varindex(name) >= .) {
-        _stx_error(111, "variable " + name + " not found; supply it with at()")
-    }
-    return(st_data(., name, touse))
+    M = _stx_usemodel()
+    st_local("_stx_refdat", invtokens(M.ref.datnames))
+    st_local("_stx_excdat", invtokens(M.exc.datnames))
 }
 
-// covariate/offset/indicator blocks for predictions over touse rows.
-// zeros applies to covariates and the indicator (not to offset variables).
+// covariate/offset/indicator blocks for predictions over touse rows
 void _stx_preddata(struct _stx_model scalar M, string scalar touse,
-    real scalar m, string scalar pfx, real scalar zeros, real scalar needind,
+    real scalar m, real scalar needind,
     real matrix Xr, real matrix Xe, real matrix OFFr, real matrix OFFe,
     real colvector ind)
 {
-    real scalar j
+    string rowvector mr, me
 
-    Xr = J(m, cols(M.ref.datnames), .)
-    for (j = 1; j <= cols(M.ref.datnames); j++) {
-        Xr[., j] = _stx_datcol(M.ref.datnames[j], touse, m, pfx, zeros)
+    mr = tokens(st_local("_stx_refmap"))
+    me = tokens(st_local("_stx_excmap"))
+    if (cols(mr) != cols(M.ref.datnames) |
+        cols(me) != cols(M.exc.datnames)) {
+        _error(3498, "internal: prediction variable map misaligned")
     }
-    Xe = J(m, cols(M.exc.datnames), .)
-    for (j = 1; j <= cols(M.exc.datnames); j++) {
-        Xe[., j] = _stx_datcol(M.exc.datnames[j], touse, m, pfx, zeros)
+    Xr = (cols(mr) ? st_data(., mr, touse) : J(m, 0, 0))
+    Xe = (cols(me) ? st_data(., me, touse) : J(m, 0, 0))
+    OFFr = _stx_offmat(M.ref, touse, m)
+    OFFe = _stx_offmat(M.exc, touse, m)
+    if (needind) {
+        if (_st_varindex(M.indvar) >= .) {
+            _stx_error(111, "the indicator variable " + M.indvar +
+                " was not found; supply it with at()")
+        }
+        ind = st_data(., M.indvar, touse)
     }
-    OFFr = _stx_offmat(M.ref, touse, m, pfx)
-    OFFe = _stx_offmat(M.exc, touse, m, pfx)
-    ind = (needind ? _stx_datcol(M.indvar, touse, m, pfx, zeros) : J(m, 1, 1))
+    else ind = J(m, 1, 1)
 }
 
 // ========================================================================= //
@@ -1327,54 +1355,101 @@ void _stx_standest(struct _stx_model scalar M, real colvector times,
 // postestimation drivers -- macro contract from stexcess_p.ado
 // ========================================================================= //
 
-void _stx_storeback(string scalar touse, real colvector est,
-    real matrix Jc, struct _stx_model scalar M, string scalar transform,
-    real scalar level)
+// results are stashed in Mata and written out by _stx_flush() once the
+// wrapper has restored the data (at()/zeros run under preserve, so anything
+// st_store'd before the restore would be rolled back)
+void _stx_stash(real colvector est, real matrix Jc,
+    struct _stx_model scalar M, string scalar transform, real scalar level)
 {
+    external real colvector STX_O_est, STX_O_lci, STX_O_uci
     real colvector lci, uci
 
-    st_store(., st_local("_stx_out"), touse, est)
+    STX_O_est = est
+    STX_O_lci = STX_O_uci = J(0, 1, .)
     if (st_local("_stx_ci") == "") return
     lci = .
     uci = .
     _stx_delta(est, Jc, M.V, transform, level, lci, uci)
-    st_store(., st_local("_stx_lci"), touse, lci)
-    st_store(., st_local("_stx_uci"), touse, uci)
+    STX_O_lci = lci
+    STX_O_uci = uci
 }
 
-// plain predict: observed-row covariates/indicator with at()/zeros overrides
+void _stx_flush()
+{
+    external real colvector STX_O_est, STX_O_lci, STX_O_uci
+    string scalar touse
+
+    touse = st_local("_stx_touse")
+    st_store(., st_local("_stx_out"), touse, STX_O_est)
+    if (st_local("_stx_ci") != "") {
+        st_store(., st_local("_stx_lci"), touse, STX_O_lci)
+        st_store(., st_local("_stx_uci"), touse, STX_O_uci)
+    }
+    STX_O_est = STX_O_lci = STX_O_uci = J(0, 1, .)
+}
+
+// plain predict: observed-row covariates/indicator (the wrapper has already
+// applied any at()/zeros overrides as data replacements)
 void _stx_predict(real scalar level)
 {
     struct _stx_model scalar M
     string scalar touse, q
     real colvector times, est, ind
     real matrix Jc, Xr, Xe, OFFr, OFFe
-    real scalar doJ, zeros
+    real scalar doJ
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
-    zeros = st_local("_stx_zeros") != ""
     Xr = Xe = OFFr = OFFe = .
     ind = .
-    _stx_preddata(M, touse, rows(times), "at", zeros, _stx_needind(q),
+    _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
     est = .
     Jc = .
     _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, est, Jc)
-    _stx_storeback(touse, est, Jc, M, _stx_transform(q), level)
+    _stx_stash(est, Jc, M, _stx_transform(q), level)
 }
 
-// contrast: at1() vs at2() difference or ratio of any quantity
-void _stx_contrast(real scalar level)
+// contrast: the wrapper applies at1(), calls _stx_cside1(), restores,
+// applies at2(), then _stx_cside2() combines and stashes
+void _stx_cside1()
 {
+    external real colvector STX_C_e1
+    external real matrix STX_C_J1
+    struct _stx_model scalar M
+    string scalar touse, q
+    real colvector times, e1, ind
+    real matrix J1, Xr, Xe, OFFr, OFFe
+    real scalar doJ
+
+    M = _stx_usemodel()
+    touse = st_local("_stx_touse")
+    times = st_data(., st_local("_stx_timevar"), touse)
+    q = st_local("_stx_quantity")
+    doJ = st_local("_stx_ci") != ""
+    Xr = Xe = OFFr = OFFe = .
+    ind = .
+    e1 = .
+    J1 = .
+    _stx_preddata(M, touse, rows(times), _stx_needind(q),
+        Xr, Xe, OFFr, OFFe, ind)
+    _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, e1, J1)
+    STX_C_e1 = e1
+    STX_C_J1 = (doJ ? J1 : J(0, 0, .))
+}
+
+void _stx_cside2(real scalar level)
+{
+    external real colvector STX_C_e1
+    external real matrix STX_C_J1
     struct _stx_model scalar M
     string scalar touse, q, kind
-    real colvector times, e1, e2, est, ind
-    real matrix J1, J2, Jc, Xr, Xe, OFFr, OFFe
-    real scalar doJ, zeros, needind
+    real colvector times, e2, est, ind
+    real matrix J2, Jc, Xr, Xe, OFFr, OFFe
+    real scalar doJ
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
@@ -1382,40 +1457,38 @@ void _stx_contrast(real scalar level)
     q = st_local("_stx_quantity")
     kind = st_local("_stx_kind")
     doJ = st_local("_stx_ci") != ""
-    zeros = st_local("_stx_zeros") != ""
-    needind = _stx_needind(q)
     Xr = Xe = OFFr = OFFe = .
     ind = .
-    e1 = e2 = .
-    J1 = J2 = .
-    _stx_preddata(M, touse, rows(times), "at1", zeros, needind,
-        Xr, Xe, OFFr, OFFe, ind)
-    _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, e1, J1)
-    _stx_preddata(M, touse, rows(times), "at2", zeros, needind,
+    e2 = .
+    J2 = .
+    Jc = .
+    _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
     _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, e2, J2)
     if (kind == "ratio") {
-        est = e1 :/ e2
-        if (doJ) Jc = (J1 :* e2 - e1 :* J2) :/ (e2 :^ 2)
-        _stx_storeback(touse, est, Jc, M, "log", level)
+        est = STX_C_e1 :/ e2
+        if (doJ) Jc = (STX_C_J1 :* e2 - STX_C_e1 :* J2) :/ (e2 :^ 2)
+        _stx_stash(est, Jc, M, "log", level)
     }
     else {
-        est = e1 - e2
-        if (doJ) Jc = J1 - J2
-        _stx_storeback(touse, est, Jc, M, "identity", level)
+        est = STX_C_e1 - e2
+        if (doJ) Jc = STX_C_J1 - J2
+        _stx_stash(est, Jc, M, "identity", level)
     }
+    STX_C_e1 = J(0, 1, .)
+    STX_C_J1 = J(0, 0, .)
 }
 
-// standardised predict: average over e(sample), with at()/zeros overrides
-// applied across the population (counterfactual standardisation);
-// n_nodes = 50 (40 for rmst, with 40 outer nodes), chunked at 4000
+// standardised predict: average over e(sample); at()/zeros overrides are
+// applied across the population by the wrapper (counterfactual
+// standardisation); n_nodes = 50 (40 for rmst, outer 40), chunked at 4000
 void _stx_standsurv(real scalar level)
 {
     struct _stx_model scalar M
     string scalar touse, pop, q
     real colvector times, est, taus, half_out, Sflat, no, wo, ind
     real matrix Jc, Xr, Xe, OFFr, OFFe, glm, U, Jo
-    real scalar doJ, m, Mo, j, zeros, npop
+    real scalar doJ, m, Mo, j, npop
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
@@ -1423,11 +1496,10 @@ void _stx_standsurv(real scalar level)
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
-    zeros = st_local("_stx_zeros") != ""
     npop = rows(st_data(., pop, pop))
     Xr = Xe = OFFr = OFFe = .
     ind = .
-    _stx_preddata(M, pop, npop, "at", zeros,
+    _stx_preddata(M, pop, npop,
         _stx_needind(q == "rmst" | q == "timelost" ? "survival" : q),
         Xr, Xe, OFFr, OFFe, ind)
     est = .
@@ -1457,12 +1529,12 @@ void _stx_standsurv(real scalar level)
             }
             if (q == "timelost") Jc = -Jc
         }
-        _stx_storeback(touse, est, Jc, M, "log", level)
+        _stx_stash(est, Jc, M, "log", level)
         return
     }
     _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, 4000, doJ,
         est, Jc)
-    _stx_storeback(touse, est, Jc, M, _stx_transform(q), level)
+    _stx_stash(est, Jc, M, _stx_transform(q), level)
 }
 
 end

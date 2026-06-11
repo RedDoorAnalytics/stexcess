@@ -24,6 +24,9 @@ faster than version 1 (~5 seconds for 200,000 records on a laptop).
   time-varying effects, multiple timescales (`time2()`–`time5()` with
   `offset()`/`moffset()`, e.g. attained age), `time`/`tvctime`
   identity-scale splines, `offset()` on the baseline, `noconstant`
+- factor variables and interactions (`i.stage`, `c.age##i.sex`), with
+  `at()` operating on the underlying variables so indicator and interaction
+  terms are recomputed automatically
 - joint maximum likelihood or `twostage` estimation (reference fitted to
   controls only, with a stacked M-estimation sandwich variance)
 - predictions: hazard, cumulative hazard, survival, CIF, RMST, time lost,

@@ -19,8 +19,10 @@
 {phang3}[{varlist}] [{cmd:,} {it:model_options}]{p_end}
 
 {phang2}The data must be {help stset} (without weights, which are not
-supported). Factor variables are not allowed; covariates must be numeric
-variables.{p_end}
+supported). {it:varlist} may contain factor variables and interactions
+(e.g. {cmd:i.stage} or {cmd:c.age##i.sex}); base and omitted levels are
+shown in the coefficient table with zero coefficients. Factor variables are
+not allowed inside {opt tvc()} or as offset variables.{p_end}
 
 {synoptset 27 tabbed}{...}
 {synopthdr:options}

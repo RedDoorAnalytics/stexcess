@@ -103,7 +103,6 @@ program stexcess_p
                     di as err "`a'(): invalid value for `1'"
                     exit 198
                 }
-                local _stx_`a'_`1' = `2'
                 local newspec `newspec' `1' `2'
                 macro shift 2
             }
@@ -111,11 +110,45 @@ program stexcess_p
         }
     }
 
-    // ---- output variables: built as tempvars so a failed prediction
-    // leaves nothing behind, renamed into place on success ----
     if "`ci'" != "" {
         confirm new variable `varlist'_lci `varlist'_uci
     }
+
+    // at()/zeros are applied as data replacements under preserve (v1
+    // semantics), so factor-variable terms rebuilt by fvrevar reflect the
+    // overridden values; _stx_compute applies the replacements, rebuilds the
+    // variable maps and runs the Mata driver within one program scope (the
+    // fvrevar tempvars die with it), stashing the results, which are written
+    // out by _stx_flush() after the restore
+    local dooverride = (`"`at'`at1'`at2'"' != "" | "`zeros'" != "")
+    local copt touse(`touse') timevar(`timevar') quantity(`quantity') ///
+        kind(`kind') `ci' `zeros'
+    local qlabel "stexcess `stat'"
+    if `docontrast' {
+        preserve
+        _stx_compute, driver(_stx_cside1()) atspec(`at1') `copt'
+        restore, preserve
+        _stx_compute, driver(_stx_cside2(`level')) atspec(`at2') `copt'
+        restore
+    }
+    else if "`standardise'" != "" {
+        if `dooverride' preserve
+        _stx_compute, driver(_stx_standsurv(`level')) atspec(`at') ///
+            standardise `copt'
+        if `dooverride' restore
+        local qlabel "standardised `stat'"
+    }
+    else {
+        if `dooverride' preserve
+        _stx_compute, driver(_stx_predict(`level')) atspec(`at') `copt'
+        if `dooverride' restore
+    }
+
+    local _stx_touse `touse'
+    local _stx_ci    `ci'
+
+    // output variables: tempvars renamed into place, so a failed prediction
+    // leaves nothing behind
     tempvar out lci uci
     local _stx_out `out'
     qui gen double `out' = .
@@ -125,31 +158,7 @@ program stexcess_p
         qui gen double `lci' = .
         qui gen double `uci' = .
     }
-
-    local _stx_timevar  `timevar'
-    local _stx_touse    `touse'
-    local _stx_quantity `quantity'
-    local _stx_kind     `kind'
-    local _stx_zeros    `zeros'
-    local _stx_ci       `ci'
-
-    if `docontrast' {
-        mata: _stx_contrast(`level')
-        local qlabel "stexcess `stat'"
-    }
-    else if "`standardise'" != "" {
-        // standardisation population = estimation sample (with at()/zeros
-        // overrides applied across the population)
-        tempvar pop
-        qui gen byte `pop' = e(sample)
-        local _stx_poptouse `pop'
-        mata: _stx_standsurv(`level')
-        local qlabel "standardised `stat'"
-    }
-    else {
-        mata: _stx_predict(`level')
-        local qlabel "stexcess `stat'"
-    }
+    mata: _stx_flush()
     rename `out' `varlist'
     if "`ci'" != "" {
         rename `lci' `varlist'_lci
@@ -176,4 +185,53 @@ program stexcess_p
         label var `_stx_lci' "`qlabel', lower `level'% CI"
         label var `_stx_uci' "`qlabel', upper `level'% CI"
     }
+end
+
+// apply zeros/at() data replacements (the caller's restore undoes them),
+// rebuild the model's data-column maps and run one Mata prediction driver.
+// All in one program scope: fvrevar tempvars only live that long, and the
+// Mata drivers read the _stx_* locals of the program that invokes them.
+program _stx_compute
+    syntax , DRiver(string) TOuse(string) TIMevar(string) ///
+        QUANTity(string) [ KINd(string) ATSpec(string) CI ZEROs STANDardise ]
+
+    local _stx_touse    `touse'
+    local _stx_timevar  `timevar'
+    local _stx_quantity `quantity'
+    local _stx_kind     `kind'
+    local _stx_ci       `ci'
+
+    if "`zeros'" != "" {
+        foreach v in `e(zerovars)' {
+            qui replace `v' = 0
+        }
+    }
+    tokenize `atspec'
+    while "`1'" != "" {
+        qui replace `1' = `2'
+        macro shift 2
+    }
+
+    mata: _stx_mapinfo()                  // -> _stx_refdat, _stx_excdat
+    // NB: term by term -- fvrevar applied to several levels of one factor
+    // re-applies base logic and zeroes the first level
+    local _stx_refmap ""
+    foreach trm in `_stx_refdat' {
+        fvrevar `trm'
+        local _stx_refmap `_stx_refmap' `r(varlist)'
+    }
+    local _stx_excmap ""
+    foreach trm in `_stx_excdat' {
+        fvrevar `trm'
+        local _stx_excmap `_stx_excmap' `r(varlist)'
+    }
+
+    if "`standardise'" != "" {
+        // standardisation population = estimation sample (with the
+        // overrides applied across the population)
+        tempvar pop
+        qui gen byte `pop' = e(sample)
+        local _stx_poptouse `pop'
+    }
+    mata: `driver'
 end

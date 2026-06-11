@@ -76,7 +76,14 @@ program Estimate, eclass
         exit 101
     }
     marksample touse
-    markout `touse' _t _d `indicator' `refvars' `excvars'
+    foreach c in ref exc {
+        local `c'und ""
+        if "``c'vars'" != "" {
+            fvrevar ``c'vars', list
+            local `c'und `r(varlist)'
+        }
+    }
+    markout `touse' _t _d `indicator' `refund' `excund'
     foreach c in ref exc {
         foreach j of local `c'tslist {
             markout `touse' ``c'_ts`j'_off' ``c'_ts`j'_moff' ``c'_ts`j'_tvc'
@@ -107,20 +114,44 @@ program Estimate, eclass
         exit 2000
     }
 
-    // drop collinear covariates (constant covariates are collinear with the
-    // spline intercept); tvc variables enter the design through their spline
-    // interactions, so a constant tvc variable cannot just be dropped
+    // expand factor variables and mark base/collinear terms (constant
+    // covariates are collinear with the spline intercept); tvc variables
+    // enter the design through their spline interactions, so a constant tvc
+    // variable cannot just be dropped
     foreach c in ref exc {
         local eqn = cond("`c'" == "ref", "reference", "excess")
-        if "``c'vars'" != "" & "``c'cons'" == "1" {
-            qui _rmcoll ``c'vars' if `touse', forcedrop
-            local keep `r(varlist)'
-            if "`keep'" != "``c'vars'" {
-                local dropped : list `c'vars - keep
+        local `c'full ""
+        local `c'incl ""
+        local `c'map  ""
+        if "``c'vars'" != "" {
+            local nocns = cond("``c'cons'" == "1", "", "noconstant")
+            qui _rmcoll ``c'vars' if `touse', expand `nocns'
+            local `c'full `r(varlist)'
+            local inclterms ""
+            local dropped ""
+            foreach trm of local `c'full {
+                _ms_parse_parts `trm'
+                if r(omit) {
+                    local `c'incl ``c'incl' 0
+                    // o.-marked = collinear (b.-marked = factor base level)
+                    if strpos("`trm'", "o.") local dropped `dropped' `trm'
+                }
+                else {
+                    local `c'incl ``c'incl' 1
+                    local inclterms `inclterms' `trm'
+                }
+            }
+            if "`dropped'" != "" {
                 di as txt "note: `dropped' omitted from the `eqn' " ///
                     "equation because of collinearity"
-                local `c'vars `keep'
             }
+            // NB: term by term -- fvrevar applied to several levels of one
+            // factor re-applies base logic and zeroes the first level
+            foreach trm of local inclterms {
+                fvrevar `trm'
+                local `c'map ``c'map' `r(varlist)'
+            }
+            local `c'vars `inclterms'
         }
         foreach j of local `c'tslist {
             foreach v of local `c'_ts`j'_tvc {
@@ -147,7 +178,10 @@ program Estimate, eclass
     local _stx_vtol    `ltolerance'
     local _stx_nrtol   `nrtolerance'
     foreach c in ref exc {
-        local _stx_`c'vars   ``c'vars'
+        local _stx_`c'vars    ``c'vars'
+        local _stx_`c'covfull ``c'full'
+        local _stx_`c'covincl ``c'incl'
+        local _stx_`c'covmap  ``c'map'
         local _stx_`c'_cons  ``c'cons'
         local _stx_`c'_tslist ``c'tslist'
         foreach j of local `c'tslist {
@@ -201,7 +235,19 @@ program Estimate, eclass
             }
         }
     }
-    ereturn local  atvars    "`_stx_atvars'"
+    local atvars `refund' `excund' `indicator'
+    local zerovars `refund' `excund' `indicator'
+    foreach c in ref exc {
+        foreach j of local `c'tslist {
+            local atvars `atvars' ``c'_ts`j'_off' ``c'_ts`j'_moff' ///
+                ``c'_ts`j'_tvc'
+            local zerovars `zerovars' ``c'_ts`j'_tvc'
+        }
+    }
+    local atvars : list uniq atvars
+    local zerovars : list uniq zerovars
+    ereturn local  atvars    "`atvars'"
+    ereturn local  zerovars  "`zerovars'"
     ereturn local  method    = cond("`twostage'" != "", "twostage", "joint")
     if "`twostage'" != "" {
         ereturn local vce     "robust"
@@ -253,7 +299,7 @@ program _parsemodel, sclass
     sreturn clear
     gettoken eqn 0 : 0                     // "reference" | "excess"
 
-    syntax [varlist(numeric default=none)] , ///
+    syntax [varlist(numeric default=none fv)] , ///
         [ DF(numlist max=1 integer >0) KNOTS(numlist ascending min=2) ///
           NOORTHog TIME OFFset(varname numeric) MOFFset(varname numeric) ///
           TVC(varlist numeric) DFTvc(numlist integer >0) TVCTIME ///

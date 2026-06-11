@@ -61,10 +61,13 @@ patient record ({it:indicator} = 1) {cmd:hazard} is the total hazard
 {opt at()} overrides any of them with fixed values -- in particular the
 indicator itself: {cmd:at(}{it:indicator}{cmd: 1)} forces total quantities
 and {cmd:at(}{it:indicator}{cmd: 0)} reference-only quantities, regardless of
-each record's arm. Variables usable inside {opt at()} are the model
-covariates, the indicator and any timescale offset variables (stored in
-{cmd:e(atvars)}). {opt zeros} sets covariates and the indicator (but not
-offset variables) to zero; {opt at()} wins where both apply.
+each record's arm. Variables usable inside {opt at()} are the {bf:underlying}
+model covariates (for factor variables and interactions, the variable itself,
+e.g. {cmd:at(stage 3)} -- the indicator/interaction terms are recomputed from
+the overridden values), the indicator and any timescale offset variables
+(stored in {cmd:e(atvars)}). {opt zeros} sets the underlying covariates and
+the indicator (but not offset variables) to zero; {opt at()} wins where both
+apply.
 
 {pstd}
 The net statistics ({opt netsurvival}, {opt excesshazard}, {opt rmstnet})
