@@ -81,7 +81,10 @@ Estimation runs entirely inside Stata: the designs are built once in Mata and
 maximised with Mata's {helpb mf_optimize:optimize()} -- the Newton-Raphson
 engine underneath {helpb ml} -- using an exact analytic log likelihood,
 gradient and Hessian. Predictions and standardisation use analytic
-delta-method Jacobians. There are no dependencies outside Stata.
+delta-method Jacobians. There are no dependencies outside Stata. Starting
+values for the joint fit come from first fitting the reference model to the
+control records alone, with the excess parameters started at zero apart from
+a crude event-rate intercept; {opt from()} overrides this.
 
 {pstd}
 By default both components are estimated jointly by maximum likelihood, so

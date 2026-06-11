@@ -1,0 +1,15 @@
+# local dev docs -- kept out of the public repo (README.dev.md is the dev
+# repo's README; the tracked README.md still describes v1 and needs a rewrite)
+DESIGN.md
+METHODS.md
+README.dev.md
+bench/SPEED.md
+
+# Stata batch logs and build artefacts
+*.log
+*.stir
+
+# test artefacts (parity runs write here)
+testing/parity_*.dta
+testing/*.ster
+.DS_Store
