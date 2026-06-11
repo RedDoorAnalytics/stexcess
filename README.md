@@ -1,8 +1,71 @@
 # stexcess
-Modelled excess hazard models
 
-To install directly from this GitHub repository, use:
+Stata command for **modelled excess hazard models** — a relative-survival /
+excess-hazard model in which the expected (reference) rate is itself a fitted
+hazard model estimated from a control cohort, rather than taken from external
+population life tables:
 
-```{stata}
+    h_total(t | x) = h_ref(t | x) + h_exc(t | x)
+
+Both components are flexible parametric models (restricted cubic splines on
+the log-hazard scale), estimated jointly so that the uncertainty in the
+reference model propagates into every excess and net quantity.
+
+Version 2 is a ground-up reimplementation with a pure Stata/Mata core:
+designs are built once in Mata and maximised with `optimize()` using an exact
+analytic log likelihood, gradient and Hessian; predictions, contrasts and
+g-formula standardisation use analytic delta-method Jacobians. There are no
+dependencies outside Stata, and estimation is roughly two orders of magnitude
+faster than version 1 (~5 seconds for 200,000 records on a laptop).
+
+## Features
+
+- v1-compatible syntax: per-component `df()`/`knots()`, `tvc()`/`dftvc()`
+  time-varying effects, multiple timescales (`time2()`–`time5()` with
+  `offset()`/`moffset()`, e.g. attained age), `time`/`tvctime`
+  identity-scale splines, `offset()` on the baseline, `noconstant`
+- joint maximum likelihood or `twostage` estimation (reference fitted to
+  controls only, with a stacked M-estimation sandwich variance)
+- predictions: hazard, cumulative hazard, survival, CIF, RMST, time lost,
+  net (excess-only) survival/hazard/RMST, differences and ratios — all with
+  analytic delta-method confidence intervals
+- regression-standardised (g-formula) predictions over the estimation
+  sample, including counterfactual `at()` overrides
+
+## Installation
+
+Requires Stata 19.5 or later.
+
+```stata
 net install stexcess, from("https://raw.githubusercontent.com/RedDoorAnalytics/stexcess/main/")
 ```
+
+## Getting started
+
+```stata
+stset survtime, failure(died)
+stexcess (age sex, df(3))(age sex, df(3)), indicator(patient)
+
+predict h,  hazard ci                       // observed covariates + arm
+predict sn, netsurvival ci at(age 60)       // net survival, age 60
+
+range tt 0 10 100
+predict ms, survival standardise timevar(tt) ci at(patient 1)
+predict rsr, sratio at1(age 60 patient 1) at2(age 60 patient 0) ///
+    timevar(tt) ci                          // relative survival ratio
+```
+
+See `help stexcess` and `help stexcess postestimation` for the full syntax.
+
+## Validation
+
+The Mata core is certified against the likelihood of the original
+(merlin-based) stexcess v1.1.1 evaluated at the same parameters — exact
+agreement across multi-timescale, offset and time-varying-effect
+configurations — and reproduces a v1 multiple-timescale fit
+coefficient-for-coefficient when given v1's knots (`testing/`).
+
+## Author
+
+Michael J. Crowther, Red Door Analytics AB, Stockholm
+(michael.crowther@reddooranalytics.se)

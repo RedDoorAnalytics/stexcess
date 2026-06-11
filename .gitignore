@@ -1,9 +1,8 @@
-# local dev docs -- kept out of the public repo (README.dev.md is the dev
-# repo's README; the tracked README.md still describes v1 and needs a rewrite)
+# local dev docs -- working copies kept out of the public repo
 DESIGN.md
 METHODS.md
 README.dev.md
-bench/SPEED.md
+bench/
 
 # Stata batch logs and build artefacts
 *.log
