@@ -33,7 +33,8 @@ program Estimate, eclass
 
     local 0 `"`stxglob_if' `stxglob_in', `stxglob_op'"'
     syntax [if] [in], INDicator(varname numeric) ///
-        [ CHINTpoints(integer 30) TWOstage Level(cilevel) FROM(name) ///
+        [ CHINTpoints(integer 30) TWOstage VCE(string) Level(cilevel) ///
+          FROM(name) ///
           ITERate(numlist max=1 integer >=0) TOLerance(numlist max=1 >0) ///
           LTOLerance(numlist max=1 >0) NRTOLerance(numlist max=1 >0) ///
           EFORM noLOG DEBUG EVALtype(string) ]
@@ -43,6 +44,25 @@ program Estimate, eclass
     if `chintpoints' < 1 {
         di as err "chintpoints() must be >= 1"
         exit 198
+    }
+    local clustvar ""
+    if `"`vce'"' != "" {
+        gettoken vcetok vcerest : vce
+        local vcerest = strtrim(`"`vcerest'"')
+        if "`vcetok'" == substr("robust", 1, max(1, length("`vcetok'"))) ///
+            & `"`vcerest'"' == "" {
+            local vce robust
+        }
+        else if "`vcetok'" == substr("cluster", 1, ///
+            max(2, length("`vcetok'"))) & `"`vcerest'"' != "" {
+            local vce cluster
+            confirm variable `vcerest'
+            local clustvar `vcerest'
+        }
+        else {
+            di as err "vce() must be vce(robust) or vce(cluster clustvar)"
+            exit 198
+        }
     }
     if "`from'" != "" {
         confirm matrix `from'
@@ -74,6 +94,10 @@ program Estimate, eclass
     // already required them to be positive and fweights to be integers
     local wtype : char _dta[st_wt]
     local wvar  : char _dta[st_wv]
+    if "`wtype'" == "iweight" & "`vce'" != "" {
+        di as err "vce(`vce') not allowed with iweights"
+        exit 101
+    }
     marksample touse
     foreach c in ref exc {
         local `c'und ""
@@ -91,6 +115,11 @@ program Estimate, eclass
     qui count if `touse'
     if r(N) == 0 error 2000
     local nobs = r(N)
+    if "`clustvar'" != "" {                  // numeric id (strings allowed)
+        tempvar clid
+        qui egen long `clid' = group(`clustvar') if `touse'
+        markout `touse' `clid'
+    }
 
     qui count if !inlist(`indicator', 0, 1) & `touse'
     if r(N) {
@@ -188,6 +217,8 @@ program Estimate, eclass
     local _stx_nolog   `log'
     local _stx_wvar    `wvar'
     local _stx_wtype   `wtype'
+    local _stx_vce     `vce'
+    local _stx_clvar   `clid'
     local _stx_iterate `iterate'
     local _stx_ptol    `tolerance'
     local _stx_vtol    `ltolerance'
@@ -264,7 +295,13 @@ program Estimate, eclass
     ereturn local  atvars    "`atvars'"
     ereturn local  zerovars  "`zerovars'"
     ereturn local  method    = cond("`twostage'" != "", "twostage", "joint")
-    if "`twostage'" != "" | "`wtype'" == "pweight" {
+    if "`vce'" == "cluster" {
+        ereturn local  vce      "cluster"
+        ereturn local  vcetype  "Robust"
+        ereturn local  clustvar "`clustvar'"
+        ereturn scalar N_clust  = `_stx_nclust'
+    }
+    else if "`twostage'" != "" | "`wtype'" == "pweight" | "`vce'" == "robust" {
         ereturn local vce     "robust"
         ereturn local vcetype "Robust"
     }
@@ -306,6 +343,11 @@ program Display
             "only; stacked sandwich variance."
     }
     if e(converged) == 0 di as err "convergence not achieved"
+    if e(N_clust) < . {
+        di as txt _col(15) "(Std. err. adjusted for " as res ///
+            %5.0fc e(N_clust) as txt " clusters in " ///
+            as res "`e(clustvar)'" as txt ")"
+    }
     ereturn display, level(`level') `eopt'
     di as txt "Equations: {bf:ref} = reference (control) hazard, " ///
         "{bf:exc} = excess hazard"

@@ -30,7 +30,8 @@ faster than version 1 (~5 seconds for 200,000 records on a laptop).
 - joint maximum likelihood or `twostage` estimation (reference fitted to
   controls only, with a stacked M-estimation sandwich variance)
 - stset weights: fweights (exactly equivalent to expanded data), pweights
-  (robust sandwich variance), iweights
+  (robust sandwich variance), iweights; delayed entry (left truncation)
+- `vce(robust)` and `vce(cluster clustvar)` sandwich variances
 - predictions: hazard, cumulative hazard, survival, CIF, RMST, time lost,
   net (excess-only) survival/hazard/RMST, differences and ratios — all with
   analytic delta-method confidence intervals

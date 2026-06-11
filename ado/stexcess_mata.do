@@ -383,6 +383,17 @@ real matrix _stx_qsum(real colvector e, real matrix Wq, real scalar G)
     return(out)
 }
 
+// rows of S summed within clusters (for cluster-robust sandwiches)
+real matrix _stx_clsum(real matrix S, real colvector c)
+{
+    real colvector ord
+    real matrix info
+
+    ord = order(c, 1)
+    info = panelsetup(c[ord], 1)
+    return(panelsum(S[ord, .], info))
+}
+
 // ========================================================================= //
 // offsets and component specs (driven by the .ado macro contract)
 // ========================================================================= //
@@ -684,8 +695,10 @@ void _stx_fit()
     transmorphic S, S2
     string scalar touse, fromname
     real colvector t, t0, d, ind, nd, w, cm, pm, eC, eR, eE, hr, he, pi, w2
-    real colvector wgt, wd, thr, the
-    real matrix Spr, Spe, Brob
+    real colvector wgt, wd, thr, the, wstk
+    real matrix Spr, Spe, Brob, Srows
+    real scalar fac
+    string scalar vce
     real matrix Xr, Xe, OFFr, OFFe, glm, Dev, Wq, V, A, B, Sc, Sp, Ainv
     real matrix A11, A21, A22
     real rowvector b0, b
@@ -828,9 +841,13 @@ void _stx_fit()
         conv = optimize_result_converged(S)
         iter = optimize_result_iterations(S)
 
-        // pweights: robust sandwich A^-1 B A^-1 with B from the per-record
-        // weighted scores (the weights are already inside Cd/Pd/cw)
-        if (M.wtype == "pweight") {
+        // pweights / vce(robust) / vce(cluster): sandwich A^-1 B A^-1 from
+        // the per-record weighted scores (the weights are already inside
+        // Cd/Pd/cw), with the official finite-sample factors N/(N-1) and
+        // G/(G-1); under fweights B sums w*ss' (expanded-data equivalent)
+        // and N is the sum of the weights
+        vce = st_local("_stx_vce")
+        if (M.wtype == "pweight" | vce != "") {
             thr = b[(1..D.pr)]'
             the = b[((D.pr + 1)..k)]'
             eC = D.Ccw :* exp(D.CWq * thr)
@@ -841,8 +858,21 @@ void _stx_fit()
             Sc  = D.Cd :* D.CDev - _stx_qsum(eC, D.CWq, G)
             Spr = (D.Pd :* pi) :* D.RDev - _stx_qsum(eR, D.RWq, G)
             Spe = (D.Pd :* (1 :- pi)) :* D.EDev - _stx_qsum(eE, D.EWq, G)
-            Brob = cross((Sc, J(rows(Sc), pe, 0) \ Spr, Spe),
-                         (Sc, J(rows(Sc), pe, 0) \ Spr, Spe))
+            Srows = (Sc, J(rows(Sc), pe, 0) \ Spr, Spe)
+            wstk = (select(wgt, cm) \ select(wgt, pm))
+            if (vce == "cluster") {
+                Srows = _stx_clsum(Srows,
+                    st_data(., st_local("_stx_clvar"), touse)[
+                        (selectindex(cm) \ selectindex(pm))])
+                fac = rows(Srows) / (rows(Srows) - 1)
+                st_local("_stx_nclust", strofreal(rows(Srows)))
+            }
+            else if (M.wtype == "fweight") {
+                Srows = Srows :/ sqrt(wstk)
+                fac = sum(wgt) / (sum(wgt) - 1)
+            }
+            else fac = n / (n - 1)
+            Brob = fac :* cross(Srows, Srows)
             V = V * Brob * V
             V = 0.5 :* (V + V')
         }
@@ -877,11 +907,24 @@ void _stx_fit()
         // the score rows carry one factor of the weights; pweights keep it
         // squared (sum of (w s)(w s)'), fweights/iweights need the
         // expanded-data sum of w s s'
-        if (M.wtype != "pweight" & M.wvar != "") {
-            Sc = Sc :/ sqrt(select(wgt, cm))
-            Sp = Sp :/ sqrt(select(wgt, pm))
+        vce = st_local("_stx_vce")
+        if (vce == "cluster") {
+            Srows = _stx_clsum((Sc, J(rows(Sc), pe, 0) \
+                    J(rows(Sp), D.pr, 0), Sp),
+                st_data(., st_local("_stx_clvar"), touse)[
+                    (selectindex(cm) \ selectindex(pm))])
+            st_local("_stx_nclust", strofreal(rows(Srows)))
+            B = (rows(Srows) / (rows(Srows) - 1)) :*
+                cross(Srows, Srows)
         }
-        B = (cross(Sc, Sc), J(D.pr, pe, 0) \ J(pe, D.pr, 0), cross(Sp, Sp))
+        else {
+            if (M.wtype != "pweight" & M.wvar != "") {
+                Sc = Sc :/ sqrt(select(wgt, cm))
+                Sp = Sp :/ sqrt(select(wgt, pm))
+            }
+            B = (cross(Sc, Sc), J(D.pr, pe, 0) \
+                 J(pe, D.pr, 0), cross(Sp, Sp))
+        }
         Ainv = luinv(A)
         V = Ainv * B * Ainv'
         V = 0.5 :* (V + V')

@@ -216,6 +216,33 @@ predict en, netsurvival ci
 assert !missing(en[1])
 local ++checks
 
+// ======================================================================== //
+// F: delayed entry (left truncation): integrals over (t0, t]
+// ======================================================================== //
+preserve
+gen double entry = 2.5*runiform()
+keep if survtime > entry                       // left-truncated sample
+stset survtime, failure(died) enter(entry)
+stexcess (age, df(2) noorthog)(age, df(2) noorthog), indicator(excess)
+local llF = e(ll)
+local kF_r "`e(knotsref)'"
+local kF_e "`e(knotsexc)'"
+matrix `BV3' = e(b)
+
+qui merlin (_t age rcs(_t, knots(`kF_r') log)                         ///
+                , family(user, llf(merlin_stexcess_logl) failure(_d)  ///
+                  ltruncated(_t0)) timevar(_t))                       ///
+           (    age rcs(_t, knots(`kF_e') log)                        ///
+                , family(null, reffailure(1)) timevar(_t))            ///
+           , indicator(excess) chintpoints(30) nogen                  ///
+             from(`BV3') iterate(0) evaltype(gf1) search(off)
+di as txt "[F] delayed entry:         v2 ll = " %14.8f `llF' ///
+    "   merlin ll = " %14.8f e(ll)
+assert reldif(e(ll), `llF') < 1e-8
+local ++checks
+restore
+stset survtime, failure(died)
+
 // ---- standardisation with an offset timescale: per-individual fallback
 // path must equal the mean of row-wise predictions ----
 stexcess (age, df(2) noorthog time2(df(2) offset(ageoff) noorthog)) ///

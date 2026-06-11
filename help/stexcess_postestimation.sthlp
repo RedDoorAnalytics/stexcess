@@ -102,7 +102,8 @@ over the observed age distribution. Difference/ratio statistics and
 {title:Remarks}
 
 {pstd}
-Out-of-sample prediction is allowed: predictions are computed at
+Predictions are unconditional from time 0, also after fitting with delayed
+entry. Out-of-sample prediction is allowed: predictions are computed at
 {opt timevar()} for every observation in the {it:if/in} sample using that
 row's (possibly overridden) covariate, indicator and offset values.
 Quantities that are undefined at {it:t} = 0 on the log-time scale are filled

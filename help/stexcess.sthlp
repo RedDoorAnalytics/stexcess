@@ -18,11 +18,16 @@
 
 {phang3}[{varlist}] [{cmd:,} {it:model_options}]{p_end}
 
-{phang2}The data must be {help stset}. Weights are taken from the
+{phang2}The data must be {help stset}. Delayed entry (left truncation,
+{cmd:stset, enter()}) is supported: each record contributes the hazard
+integral over its own ({it:t0}, {it:t}]. Weights are taken from the
 {cmd:stset} specification: {cmd:fweight}s reproduce the expanded dataset
 exactly (including default knot placement), {cmd:pweight}s give
 design-consistent estimates with a robust (sandwich) variance, and
 {cmd:iweight}s weight the log likelihood with a model-based variance.
+{opt vce(robust)} and {opt vce(cluster clustvar)} request (cluster-)robust
+sandwich variances for the joint fit, with the usual finite-sample factors;
+{opt vce(cluster clustvar)} also clusters the {opt twostage} sandwich.
 {it:varlist} may contain factor variables and interactions
 (e.g. {cmd:i.stage} or {cmd:c.age##i.sex}); base and omitted levels are
 shown in the coefficient table with zero coefficients. Factor variables are
@@ -33,6 +38,7 @@ not allowed inside {opt tvc()} or as offset variables.{p_end}
 {synoptline}
 {synopt :{opth ind:icator(varname)}}required; 1 = excess (patient) record, 0 = reference (control){p_end}
 {synopt :{opt two:stage}}two-stage estimation with sandwich (robust) standard errors{p_end}
+{synopt :{opt vce(robust)}, {opt vce(cluster clustvar)}}robust or cluster-robust standard errors{p_end}
 {synopt :{opt chint:points(#)}}Gauss-Legendre nodes for cumulative hazards (default 30){p_end}
 {synopt :{opt from(matname)}}starting values (one column per model parameter){p_end}
 {synopt :{opt iter:ate(#)}}maximum number of Newton-Raphson iterations{p_end}
@@ -195,7 +201,8 @@ stacked sandwich variance{p_end}
 {synopt:{cmd:e(cmdline)}}command as typed{p_end}
 {synopt:{cmd:e(title)}}title in estimation output{p_end}
 {synopt:{cmd:e(method)}}{cmd:joint} or {cmd:twostage}{p_end}
-{synopt:{cmd:e(vce)}}{cmd:oim} or {cmd:robust}{p_end}
+{synopt:{cmd:e(vce)}}{cmd:oim}, {cmd:robust} or {cmd:cluster}{p_end}
+{synopt:{cmd:e(clustvar)}, {cmd:e(N_clust)}}cluster variable and number of clusters{p_end}
 {synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage} or {cmd:pweight}s{p_end}
 {synopt:{cmd:e(wtype)}, {cmd:e(wexp)}}weight type and variable, when stset with weights{p_end}
 {synopt:{cmd:e(indicator)}}excess indicator variable{p_end}

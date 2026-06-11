@@ -141,6 +141,18 @@ matrix b0 = e(b)
 stexcess (age, df(3))(age, df(3)), indicator(excess) from(b0)
 assert reldif(e(ll), `ll_df3') < 1e-8
 
+// ---- delayed entry (left truncation) ----
+preserve
+gen double entry = runiform()
+keep if survtime > entry
+stset survtime, failure(died) enter(entry)
+stexcess (age, df(3))(age, df(3)), indicator(excess) nolog
+assert e(converged) == 1
+predict sLT, survival ci at(age 0 excess 1)
+assert !missing(sLT[1])
+restore
+stset survtime, failure(died)
+
 // ---- eform display ----
 stexcess (age, df(3))(age, df(3)), indicator(excess) eform
 stexcess, eform              // replay
