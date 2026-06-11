@@ -173,7 +173,7 @@ program stexcess_p
 
     label var `varlist' "`qlabel'"
     if "`ci'" != "" {
-        label var `_stx_lci' "lower `=100*`level''% CI"
-        label var `_stx_uci' "upper `=100*`level''% CI"
+        label var `_stx_lci' "`qlabel', lower `level'% CI"
+        label var `_stx_uci' "`qlabel', upper `level'% CI"
     }
 end
