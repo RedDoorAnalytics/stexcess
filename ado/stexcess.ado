@@ -235,7 +235,7 @@ program Display
     di _col(49) as txt "No. of failures   =" as res %10.0fc e(N_fail)
     di _col(49) as txt "Reference records =" as res %10.0fc e(N_ref)
     di _col(49) as txt "Excess records    =" as res %10.0fc e(N_exc)
-    di as txt "Log likelihood = " as res %10.4f e(ll)
+    di as txt "Log likelihood = " as res %10.0g e(ll)
     if "`e(method)'" == "twostage" {
         di as txt "Two-stage estimation: reference fitted to controls " ///
             "only; stacked sandwich variance."
