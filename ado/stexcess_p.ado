@@ -15,7 +15,7 @@ program stexcess_p
         HRatio SRatio CIFRatio RMSTRatio ///
         STANDardise ///
         AT(string) AT1(string) AT2(string) ZEROs ///
-        TImevar(varname numeric) ///
+        TImevar(varname numeric) LTRUNCated(varname numeric) ///
         CI Level(cilevel) ]
 
     if "`e(cmd)'" != "stexcess" error 301
@@ -57,7 +57,24 @@ program stexcess_p
     if "`timevar'" == "" local timevar _t
     // output sample = requested if/in restricted to obs with a timevar value
     marksample touse, novarlist
-    markout `touse' `timevar'
+    markout `touse' `timevar' `ltruncated'
+
+    // ltruncated(): conditional predictions, e.g. S(t | t0)
+    if "`ltruncated'" != "" {
+        local condok survival cif chazard logchazard rmst timelost ///
+            netsurvival rmstnet sdifference sratio cifdifference ///
+            cifratio rmstdifference rmstratio
+        if !`: list stat in condok' {
+            di as err "ltruncated() not allowed with `stat'"
+            exit 198
+        }
+        if "`standardise'" != "" & ///
+            inlist("`stat'", "chazard", "logchazard") {
+            di as err "ltruncated() with standardise is not allowed " ///
+                "with `stat'"
+            exit 198
+        }
+    }
 
     // ---- option combinations ----
     if `docontrast' {
@@ -122,7 +139,7 @@ program stexcess_p
     // out by _stx_flush() after the restore
     local dooverride = (`"`at'`at1'`at2'"' != "" | "`zeros'" != "")
     local copt touse(`touse') timevar(`timevar') quantity(`quantity') ///
-        kind(`kind') `ci' `zeros'
+        kind(`kind') ltrunc(`ltruncated') `ci' `zeros'
     local qlabel "stexcess `stat'"
     if `docontrast' {
         preserve
@@ -167,16 +184,17 @@ program stexcess_p
         local _stx_uci `varlist'_uci
     }
 
-    // limits at t = 0 (log-time splines cannot be evaluated there)
+    // limits at t = 0 (or at the conditioning time with ltruncated())
+    local zerot = cond("`ltruncated'" == "", "0", "`ltruncated'")
     local one  survival netsurvival sratio
     local zero chazard cif rmst timelost rmstnet sdifference ///
         cifdifference rmstdifference
     if `: list stat in one' | `: list stat in zero' {
         local v = cond(`: list stat in one', 1, 0)
-        qui replace `varlist' = `v' if `timevar' == 0 & `touse'
+        qui replace `varlist' = `v' if `timevar' == `zerot' & `touse'
         if "`ci'" != "" {
-            qui replace `_stx_lci' = `v' if `timevar' == 0 & `touse'
-            qui replace `_stx_uci' = `v' if `timevar' == 0 & `touse'
+            qui replace `_stx_lci' = `v' if `timevar' == `zerot' & `touse'
+            qui replace `_stx_uci' = `v' if `timevar' == `zerot' & `touse'
         }
     }
 
@@ -193,12 +211,14 @@ end
 // Mata drivers read the _stx_* locals of the program that invokes them.
 program _stx_compute
     syntax , DRiver(string) TOuse(string) TIMevar(string) ///
-        QUANTity(string) [ KINd(string) ATSpec(string) CI ZEROs STANDardise ]
+        QUANTity(string) [ KINd(string) ATSpec(string) LTRunc(string) ///
+        CI ZEROs STANDardise ]
 
     local _stx_touse    `touse'
     local _stx_timevar  `timevar'
     local _stx_quantity `quantity'
     local _stx_kind     `kind'
+    local _stx_ltrunc   `ltrunc'
     local _stx_ci       `ci'
 
     if "`zeros'" != "" {

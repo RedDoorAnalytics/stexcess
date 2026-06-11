@@ -1057,13 +1057,15 @@ void _stx_preddata(struct _stx_model scalar M, string scalar touse,
 
 // hazard/cumhaz/survival families row by row; est (m x 1) and, when doJ,
 // Jc (m x k) on the natural scale. ind weights the excess component.
+// ct0 are per-row conditioning times: cumulative hazards integrate over
+// (ct0, t], so survival-type quantities are conditional, S(t | ct0)
 void _stx_rowquant(struct _stx_model scalar M, real colvector times,
-    real matrix Xr, real matrix Xe, real matrix OFFr, real matrix OFFe,
-    real colvector ind, string scalar q, real scalar G, real scalar doJ,
-    real colvector est, real matrix Jc)
+    real colvector ct0, real matrix Xr, real matrix Xe, real matrix OFFr,
+    real matrix OFFe, real colvector ind, string scalar q, real scalar G,
+    real scalar doJ, real colvector est, real matrix Jc)
 {
     real matrix rDev, rWq, eDev, eWq, Jr, Je, glm
-    real colvector rcw, ecw, er, ee, hr, he, Hr, He, ch, zero
+    real colvector rcw, ecw, er, ee, hr, he, Hr, He, ch, bad
     real colvector nd, w
     real scalar m, pr, k, needH, needref
 
@@ -1073,16 +1075,16 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
     glm = _stx_gl(G)
     nd = glm[., 1]
     w  = glm[., 2]
-    zero = J(m, 1, 0)
     needref = !(q == "netsurv" | q == "excesshazard")
     needH = !(q == "hazard" | q == "excesshazard")
+    bad = ct0 :> times                         // t < t0: undefined -> missing
 
     rDev = rWq = eDev = eWq = .
     rcw = ecw = .
     hr = Hr = J(m, 1, 0)
     Jr = J(m, pr, 0)
     if (needref) {
-        _stx_qdesign(times, zero, Xr, OFFr, M.ref, nd, w,
+        _stx_qdesign(times, ct0, Xr, OFFr, M.ref, nd, w,
             J(m, 1, 1), rDev, rWq, rcw)
         hr = exp(rDev * M.b[(1..pr)]')
         if (needH) {
@@ -1091,7 +1093,7 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
             if (doJ) Jr = _stx_qsum(er, rWq, G)
         }
     }
-    _stx_qdesign(times, zero, Xe, OFFe, M.exc, nd, w,
+    _stx_qdesign(times, ct0, Xe, OFFe, M.exc, nd, w,
         J(m, 1, 1), eDev, eWq, ecw)
     he = exp(eDev * M.b[((pr + 1)..k)]')
     if (needH) {
@@ -1115,14 +1117,16 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
     if (q == "chazard" | q == "logchazard") {
         ch = Hr + ind :* He
         est = (q == "logchazard" ? ln(ch) : ch)
+        est = est :+ 0 :* bad :/ (1 :- bad)    // missing where t < ct0
         if (!doJ) return
         Jc = (Jr, ind :* Je)
         if (q == "logchazard") Jc = Jc :/ ch
         return
     }
     if (q == "survival" | q == "cif") {
-        ch = exp(-(Hr + ind :* He))            // S(t)
+        ch = exp(-(Hr + ind :* He))            // S(t | ct0)
         est = (q == "cif" ? 1 :- ch : ch)
+        est = est :+ 0 :* bad :/ (1 :- bad)    // missing where t < ct0
         if (!doJ) return
         Jc = (-ch :* Jr, -ch :* (ind :* Je))
         if (q == "cif") Jc = -Jc
@@ -1130,6 +1134,7 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
     }
     if (q == "netsurv") {
         est = exp(-He)
+        est = est :+ 0 :* bad :/ (1 :- bad)    // missing where t < ct0
         if (!doJ) return
         Jc = (J(m, pr, 0), -est :* Je)
         return
@@ -1137,13 +1142,13 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
     _error(3498, "unknown quantity: " + q)
 }
 
-// RMST(tau) = int_0^tau S(u) du by outer Gauss-Legendre over the survival
-// curve (inner nodes = G, outer = 40); timelost = tau - RMST;
-// rmstnet integrates net survival
+// RMST(tau | ct0) = int_ct0^tau S(u | ct0) du by outer Gauss-Legendre over
+// the (conditional) survival curve (inner nodes = G, outer = 40);
+// timelost = (tau - ct0) - RMST; rmstnet integrates net survival
 void _stx_rmstrows(struct _stx_model scalar M, real colvector taus,
-    real matrix Xr, real matrix Xe, real matrix OFFr, real matrix OFFe,
-    real colvector ind, string scalar q, real scalar G, real scalar doJ,
-    real colvector est, real matrix Jc)
+    real colvector ct0, real matrix Xr, real matrix Xe, real matrix OFFr,
+    real matrix OFFe, real colvector ind, string scalar q, real scalar G,
+    real scalar doJ, real colvector est, real matrix Jc)
 {
     real matrix glm, Jo, U, Xrx, Xex
     real colvector no, wo, Sflat, half_out
@@ -1154,18 +1159,18 @@ void _stx_rmstrows(struct _stx_model scalar M, real colvector taus,
     no = glm[., 1]
     wo = glm[., 2]
     Mo = 40
-    half_out = 0.5 :* taus
-    U = half_out * (no :+ 1)'              // (m x Mo) outer evaluation times
+    half_out = 0.5 :* (taus - ct0)
+    U = (ct0 :+ half_out) :+ half_out * no'   // (m x Mo) outer times
 
     Xrx = (cols(Xr) ? Xr # J(Mo, 1, 1) : J(m * Mo, 0, 0))
     Xex = (cols(Xe) ? Xe # J(Mo, 1, 1) : J(m * Mo, 0, 0))
     Sflat = .
     Jo = .
-    _stx_rowquant(M, vec(U'), Xrx, Xex, OFFr # J(Mo, 1, 1),
-        OFFe # J(Mo, 1, 1), ind # J(Mo, 1, 1),
+    _stx_rowquant(M, vec(U'), ct0 # J(Mo, 1, 1), Xrx, Xex,
+        OFFr # J(Mo, 1, 1), OFFe # J(Mo, 1, 1), ind # J(Mo, 1, 1),
         (q == "rmstnet" ? "netsurv" : "survival"), G, doJ, Sflat, Jo)
     est = half_out :* (colshape(Sflat, Mo) * wo)
-    if (q == "timelost") est = taus - est
+    if (q == "timelost") est = (taus - ct0) - est
     if (!doJ) return
     Jc = J(m, cols(M.b), .)
     for (j = 1; j <= cols(M.b); j++) {
@@ -1176,15 +1181,17 @@ void _stx_rmstrows(struct _stx_model scalar M, real colvector taus,
 
 // dispatch: any quantity over per-row data (rmst inner nodes = G)
 void _stx_quantity(struct _stx_model scalar M, real colvector times,
-    real matrix Xr, real matrix Xe, real matrix OFFr, real matrix OFFe,
-    real colvector ind, string scalar q, real scalar G, real scalar doJ,
-    real colvector est, real matrix Jc)
+    real colvector ct0, real matrix Xr, real matrix Xe, real matrix OFFr,
+    real matrix OFFe, real colvector ind, string scalar q, real scalar G,
+    real scalar doJ, real colvector est, real matrix Jc)
 {
     if (q == "rmst" | q == "rmstnet" | q == "timelost") {
-        _stx_rmstrows(M, times, Xr, Xe, OFFr, OFFe, ind, q, G, doJ, est, Jc)
+        _stx_rmstrows(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, G, doJ,
+            est, Jc)
     }
     else {
-        _stx_rowquant(M, times, Xr, Xe, OFFr, OFFe, ind, q, G, doJ, est, Jc)
+        _stx_rowquant(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, G, doJ,
+            est, Jc)
     }
 }
 
@@ -1510,7 +1517,7 @@ void _stx_predict(real scalar level)
 {
     struct _stx_model scalar M
     string scalar touse, q
-    real colvector times, est, ind
+    real colvector times, est, ind, ct0
     real matrix Jc, Xr, Xe, OFFr, OFFe
     real scalar doJ
 
@@ -1519,13 +1526,16 @@ void _stx_predict(real scalar level)
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
+    ct0 = (st_local("_stx_ltrunc") == "" ? J(rows(times), 1, 0)
+        : st_data(., st_local("_stx_ltrunc"), touse))
     Xr = Xe = OFFr = OFFe = .
     ind = .
     _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
     est = .
     Jc = .
-    _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, est, Jc)
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+        est, Jc)
     _stx_stash(est, Jc, M, _stx_transform(q), level)
 }
 
@@ -1537,7 +1547,7 @@ void _stx_cside1()
     external real matrix STX_C_J1
     struct _stx_model scalar M
     string scalar touse, q
-    real colvector times, e1, ind
+    real colvector times, e1, ind, ct0
     real matrix J1, Xr, Xe, OFFr, OFFe
     real scalar doJ
 
@@ -1546,13 +1556,16 @@ void _stx_cside1()
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
+    ct0 = (st_local("_stx_ltrunc") == "" ? J(rows(times), 1, 0)
+        : st_data(., st_local("_stx_ltrunc"), touse))
     Xr = Xe = OFFr = OFFe = .
     ind = .
     e1 = .
     J1 = .
     _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
-    _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, e1, J1)
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+        e1, J1)
     STX_C_e1 = e1
     STX_C_J1 = (doJ ? J1 : J(0, 0, .))
 }
@@ -1563,7 +1576,7 @@ void _stx_cside2(real scalar level)
     external real matrix STX_C_J1
     struct _stx_model scalar M
     string scalar touse, q, kind
-    real colvector times, e2, est, ind
+    real colvector times, e2, est, ind, ct0
     real matrix J2, Jc, Xr, Xe, OFFr, OFFe
     real scalar doJ
 
@@ -1573,6 +1586,8 @@ void _stx_cside2(real scalar level)
     q = st_local("_stx_quantity")
     kind = st_local("_stx_kind")
     doJ = st_local("_stx_ci") != ""
+    ct0 = (st_local("_stx_ltrunc") == "" ? J(rows(times), 1, 0)
+        : st_data(., st_local("_stx_ltrunc"), touse))
     Xr = Xe = OFFr = OFFe = .
     ind = .
     e2 = .
@@ -1580,7 +1595,8 @@ void _stx_cside2(real scalar level)
     Jc = .
     _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
-    _stx_quantity(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ, e2, J2)
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+        e2, J2)
     if (kind == "ratio") {
         est = STX_C_e1 :/ e2
         if (doJ) Jc = (STX_C_J1 :* e2 - STX_C_e1 :* J2) :/ (e2 :^ 2)
@@ -1603,8 +1619,10 @@ void _stx_standsurv(real scalar level)
     struct _stx_model scalar M
     string scalar touse, pop, q
     real colvector times, est, taus, half_out, Sflat, no, wo, ind, wpop
-    real matrix Jc, Xr, Xe, OFFr, OFFe, glm, U, Jo
-    real scalar doJ, m, Mo, j, npop
+    real colvector ct0, S0, A, bad
+    real matrix Jc, Xr, Xe, OFFr, OFFe, glm, U, Jo, J0, JA
+    real scalar doJ, m, Mo, j, npop, cond
+    string scalar base
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
@@ -1621,6 +1639,63 @@ void _stx_standsurv(real scalar level)
     wpop = (M.wvar == "" ? J(npop, 1, 1) : st_data(., M.wvar, pop))
     est = .
     Jc = .
+    cond = st_local("_stx_ltrunc") != ""
+    ct0 = (cond ? st_data(., st_local("_stx_ltrunc"), touse)
+                : J(rows(times), 1, 0))
+    if (cond) {
+        // marginal conditional quantities: mean S(t) / mean S(ct0), with the
+        // rmst family integrating that ratio over (ct0, t]
+        base = (q == "netsurv" | q == "rmstnet" ? "netsurv" : "survival")
+        bad = ct0 :> times
+        S0 = .
+        J0 = .
+        if (q == "survival" | q == "netsurv" | q == "cif") {
+            _stx_standest(M, ct0, Xr, Xe, OFFr, OFFe, ind, wpop, base,
+                50, 4000, doJ, S0, J0)
+            Sflat = .
+            Jo = .
+            _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, wpop, base,
+                50, 4000, doJ, Sflat, Jo)
+            est = Sflat :/ S0
+            est = est :+ 0 :* bad :/ (1 :- bad)
+            if (doJ) Jc = (Jo :* S0 - Sflat :* J0) :/ (S0 :^ 2)
+            if (q == "cif") {
+                est = 1 :- est
+                if (doJ) Jc = -Jc
+            }
+            _stx_stash(est, Jc, M, _stx_transform(q), level)
+            return
+        }
+        // rmst / rmstnet / timelost, conditional
+        taus = times
+        m = rows(taus)
+        glm = _stx_gl(40)
+        no = glm[., 1]
+        wo = glm[., 2]
+        Mo = 40
+        _stx_standest(M, ct0, Xr, Xe, OFFr, OFFe, ind, wpop, base,
+            40, 4000, doJ, S0, J0)
+        half_out = 0.5 :* (taus - ct0)
+        U = (ct0 :+ half_out) :+ half_out * no'
+        Sflat = .
+        Jo = .
+        _stx_standest(M, vec(U'), Xr, Xe, OFFr, OFFe, ind, wpop, base,
+            40, 4000, doJ, Sflat, Jo)
+        A = half_out :* (colshape(Sflat, Mo) * wo)
+        est = A :/ S0
+        est = est :+ 0 :* bad :/ (1 :- bad)
+        if (q == "timelost") est = (taus - ct0) - est
+        if (doJ) {
+            JA = J(m, cols(M.b), .)
+            for (j = 1; j <= cols(M.b); j++) {
+                JA[., j] = half_out :* (colshape(Jo[., j], Mo) * wo)
+            }
+            Jc = (JA :* S0 - A :* J0) :/ (S0 :^ 2)
+            if (q == "timelost") Jc = -Jc
+        }
+        _stx_stash(est, Jc, M, "log", level)
+        return
+    }
 
     if (q == "rmst" | q == "rmstnet" | q == "timelost") {
         // outer GL over the standardised survival curve (inner = outer = 40)

@@ -34,7 +34,8 @@ faster than version 1 (~5 seconds for 200,000 records on a laptop).
 - `vce(robust)` and `vce(cluster clustvar)` sandwich variances
 - predictions: hazard, cumulative hazard, survival, CIF, RMST, time lost,
   net (excess-only) survival/hazard/RMST, differences and ratios — all with
-  analytic delta-method confidence intervals
+  analytic delta-method confidence intervals; conditional versions
+  (`ltruncated()`, e.g. S(t | t0))
 - regression-standardised (g-formula) predictions over the estimation
   sample, including counterfactual `at()` overrides
 

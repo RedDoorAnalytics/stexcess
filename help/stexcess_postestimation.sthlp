@@ -45,6 +45,7 @@
 {synopt :{opt stand:ardise}}regression-standardised (g-formula) prediction over the estimation sample{p_end}
 {synopt :{opt ci}}delta-method confidence interval in {it:newvar}{cmd:_lci}/{it:newvar}{cmd:_uci}{p_end}
 {synopt :{opth ti:mevar(varname)}}evaluate predictions at these time points (default {cmd:_t}){p_end}
+{synopt :{opth ltrunc:ated(varname)}}conditional predictions, e.g. {it:S}({it:t} | {it:t0}){p_end}
 {synopt :{opt level(#)}}confidence level{p_end}
 {synoptline}
 
@@ -102,8 +103,18 @@ over the observed age distribution. Difference/ratio statistics and
 {title:Remarks}
 
 {pstd}
-Predictions are unconditional from time 0, also after fitting with delayed
-entry. Out-of-sample prediction is allowed: predictions are computed at
+Predictions are unconditional from time 0 by default, also after fitting
+with delayed entry. {opt ltruncated(varname)} makes them conditional on
+survival to the (per-observation) times in {it:varname}: survival-type
+statistics become {it:S}({it:t} | {it:t0}) = {it:S}({it:t})/{it:S}({it:t0})
+(computed directly from the hazard integral over ({it:t0}, {it:t}], with
+delta-method CIs), cumulative hazards become {it:H}({it:t}) -
+{it:H}({it:t0}), and {opt rmst}/{opt timelost} integrate the conditional
+survival over ({it:t0}, {it:t}]. With {opt standardise} the conditional
+statistic is the marginal one, mean {it:S}({it:t}) / mean
+{it:S}({it:t0}), and the rmst family integrates that ratio. Not available
+with hazard-type statistics; observations with {it:t} < {it:t0} are set to
+missing. Out-of-sample prediction is allowed: predictions are computed at
 {opt timevar()} for every observation in the {it:if/in} sample using that
 row's (possibly overridden) covariate, indicator and offset values.
 Quantities that are undefined at {it:t} = 0 on the log-time scale are filled
@@ -143,3 +154,8 @@ patient, averaged over the observed covariate distribution{p_end}
 {pstd}Standardised excess hazard{p_end}
 
 {phang2}{stata "predict eh, excesshazard standardise timevar(tt) ci":. predict eh, excesshazard standardise timevar(tt) ci}{p_end}
+
+{pstd}Conditional survival, given survival to 1 year{p_end}
+
+{phang2}{stata "gen t1 = 1":. gen t1 = 1}{p_end}
+{phang2}{stata "predict sc, survival ltruncated(t1) timevar(tt) ci":. predict sc, survival ltruncated(t1) timevar(tt) ci}{p_end}
