@@ -162,6 +162,7 @@ program Estimate, eclass
     local _stx_bmat `b'
     local _stx_Vmat `V'
 
+    st_show
     mata: _stx_fit()
 
     // ---- assemble e() and post ----
@@ -228,7 +229,6 @@ end
 program Display
     syntax [, Level(cilevel) EFORM ]
     local eopt = cond("`eform'" != "", `"eform("exp(b)")"', "")
-    st_show
     di ""
     di as txt "`e(title)'" ///
         _col(49) as txt "Number of obs     =" as res %10.0fc e(N)

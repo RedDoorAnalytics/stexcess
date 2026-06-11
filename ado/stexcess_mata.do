@@ -750,14 +750,14 @@ void _stx_fit()
         // start the excess block at zero apart from its crude event-rate
         // intercept; falls back to the crude values if the pre-fit fails
         if (fromname == "" & sum(D.Cd) > 0) {
-            if (trace) printf("{txt}Obtaining starting values:\n")
+            if (trace) printf("\n{txt}Obtaining starting values:\n")
             S = _stx_optimize(&_stx_eval_ref(), D, b0[(1..D.pr)], 0, 25)
             if (optimize_result_errorcode(S) == 0 &
                 !missing(optimize_result_params(S))) {
                 b0[(1..D.pr)] = optimize_result_params(S)
             }
         }
-        if (trace) printf("{txt}Fitting full model:\n")
+        if (trace) printf("\n{txt}Fitting full model:\n")
         S = _stx_optimize(&_stx_eval_joint(), D, b0, trace)
         b = optimize_result_params(S)
         V = optimize_result_V_oim(S)
@@ -767,7 +767,7 @@ void _stx_fit()
     }
     else {
         // stage 1: reference on controls; stage 2: excess with ref fixed
-        if (trace) printf("{txt}Fitting reference model (controls only):\n")
+        if (trace) printf("\n{txt}Fitting reference model (controls only):\n")
         S = _stx_optimize(&_stx_eval_ref(), D, b0[(1..D.pr)], trace)
         eR = D.Rcw :* exp(D.RWq * optimize_result_params(S)')
         D.hrfix = exp(D.RDev * optimize_result_params(S)')
