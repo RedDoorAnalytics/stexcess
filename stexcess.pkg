@@ -1,8 +1,23 @@
 v 3
-d stexcess: fit excess hazard models
-d Author: Michael J. Crowther
-d Distribution-Date: 20240516
+d stexcess: fit excess hazard models with a modelled reference rate
+d
+d Modelled excess hazard models: a relative-survival / excess-hazard
+d model in which the expected (reference) rate is itself a fitted
+d hazard model estimated from a control cohort, rather than taken
+d from external population life tables. Pure Stata/Mata
+d implementation with exact analytic derivatives; supports multiple
+d timescales, time-varying effects, two-stage estimation and
+d regression-standardised predictions with delta-method CIs.
+d
+d Requires Stata 19.5 or later.
+d
+d Author: Michael J. Crowther, Red Door Analytics AB
+d Support: michael.crowther@reddooranalytics.se
+d
+d Distribution-Date: 20260611
 f ado/stexcess.ado
+f ado/stexcess_p.ado
+f ado/lstexcess.mlib
 f help/stexcess.sthlp
 f help/stexcess_postestimation.sthlp
 e

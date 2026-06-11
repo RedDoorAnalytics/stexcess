@@ -1,243 +1,177 @@
 {smcl}
-{* *! version 1.0.0  ?????2023}{...}
+{* *! version 2.0.0 stexcess (Mata core)}{...}
 {vieweralsosee "stexcess postestimation" "help stexcess_postestimation"}{...}
-{vieweralsosee "merlin" "help merlin"}{...}
-{vieweralsosee "stmerlin" "help stmerlin"}{...}
 {title:Title}
 
-{p2colset 5 17 19 2}{...}
-{p2col:{helpb stexcess} {hline 2}}estimation of a flexible parametric excess 
-hazard model with a modelled expected rate{p_end}
+{p2colset 5 18 20 2}{...}
+{p2col :{cmd:stexcess} {hline 2}}Modelled excess hazard models{p_end}
 {p2colreset}{...}
 
 
-{marker syntax}{...}
 {title:Syntax}
 
-{p 8 12 2}
-{cmd:stexcess} {bf:(}{it:reference_model}{bf:)}{bf:(}{it:excess_model}{bf:)} 
-{ifin} , 
-{bf:indicator}({varname}) [{bf:,} {help stexcess##options:{it:options}}]
+{p 8 16 2}
+{cmd:stexcess} {cmd:(}{it:reference_model}{cmd:)} {cmd:(}{it:excess_model}{cmd:)}
+{ifin}{cmd:,} {opth ind:icator(varname)} [{it:options}]
 
-{phang2}
-where {it:control_model} and {it:excess_model} are specified with
-{p_end}
+{phang2}where {it:reference_model} and {it:excess_model} are each specified as{p_end}
 
-{phang3}        
-[{it:{help merlin_models:indepsyntax}}] , 
-{help stexcess##model_options:{it:model_options}}
-{p_end}
-        
-{phang3}and {it:{help merlin_models:indepsyntax}} is a {helpb merlin} 
-linear predictor, which can be anything from a simple {varlist}, to 
-directly specifying spline or fractional polynomial functions of continuous 
-covariates.{p_end}
-	
-{phang2}You must {cmd:stset} your data before using {cmd:stexcess}; 
-see {manhelp stset ST}.{p_end}
+{phang3}[{varlist}] [{cmd:,} {it:model_options}]{p_end}
 
+{phang2}The data must be {help stset} (without weights, which are not
+supported). Factor variables are not allowed; covariates must be numeric
+variables.{p_end}
 
-{synoptset 27}{...}
-{marker options}{...}
+{synoptset 27 tabbed}{...}
 {synopthdr:options}
 {synoptline}
-{synopt:{opth ind:icator(varname)}}an indicator variable that must be coded 
-as 0 for control observations and 1 for excess observations{p_end}
-{synopt:{opt chintp:oints(#)}}defines the number of Gauss-Legendre 
-quadrature points used when calculating the cumulative hazard function{p_end}
+{synopt :{opth ind:icator(varname)}}required; 1 = excess (patient) record, 0 = reference (control){p_end}
+{synopt :{opt two:stage}}two-stage estimation with sandwich (robust) standard errors{p_end}
+{synopt :{opt chint:points(#)}}Gauss-Legendre nodes for cumulative hazards (default 30){p_end}
+{synopt :{opt from(matname)}}starting values (one column per model parameter){p_end}
 {synopt :{opt eform}}display exponentiated coefficients{p_end}
-{synopt:{it:maximize_opts}}control the maximization process{p_end}
-{synopt:{it:display_opts}}display options{p_end}
+{synopt :{opt nolog}}suppress the log-likelihood iteration log{p_end}
+{synopt :{opt level(#)}}confidence level{p_end}
 {synoptline}
-{p2colreset}{...}
 
-{synoptset 27}{...}
-{marker model_options}{...}
-{synopthdr:model options}
+{synoptset 27 tabbed}{...}
+{synopthdr:model_options}
 {synoptline}
+{synopt :{opt df(#)}}degrees of freedom for the baseline spline (default 3){p_end}
+{synopt :{opth knots(numlist)}}baseline knot locations (transformed scale, including boundaries){p_end}
+{synopt :{opt time}}baseline spline in time rather than log time{p_end}
+{synopt :{opth off:set(varname)}}added to {cmd:_t} before the baseline spline is formed{p_end}
+{synopt :{opth moff:set(varname)}}subtracted from {cmd:_t} before the baseline spline is formed{p_end}
+{synopt :{opth tvc(varlist)}}covariates with time-varying effects{p_end}
+{synopt :{opth dftvc(numlist)}}df for each time-varying effect; required with {opt tvc()}{p_end}
+{synopt :{opt tvctime}}time-varying effect splines in time rather than log time{p_end}
+{synopt :{cmd:time2(}{it:mt_opts}{cmd:)}}additional timescale; up to {cmd:time5()}{p_end}
+{synopt :{opt noorth:og}}do not orthogonalise this component's spline bases{p_end}
 {synopt :{opt nocons:tant}}omit the constant term{p_end}
-{synopt :{opth df(#)}}degrees of freedom for the baseline function with 
-{cmd:rp} or {cmd:rcs} models; see details{p_end}
-{synopt :{opt knots(knots_list)}}knot locations for the baseline function 
-with {cmd:rp} or {cmd:rcs} models; see details{p_end}
-{synopt :{opth off:set(varname)}}to add before the baseline spline function is calculated{p_end}
-{synopt :{opth moff:set(varname)}}adds the negative of {it:varname} before the baseline spline function is calculated{p_end}
-{synopt :{opth tvc(varlist)}}time-dependent effects{p_end}
-{synopt :{opth dftvc(numlist)}}degrees of freedom for each time-dependent 
-effect{p_end}
-{synopt :{opt tvctime}}use splines of time rather than log time for 
-time-dependent effects{p_end}
-{synopt :{opt noorth:og}}turns off the default orthogonalisation of any 
-spline terms{p_end}
-{synopt:{bf:time#(}{help stmerlin##mt_opts:{it:mt_opts}})}define two to five 
-additional timescales modelled with restricted cubic 
-splines, specified with {cmd:time2({help stmerlin##mt_opts:{it:mt_opts}})}, 
-with a maximum of {cmd:time5({help stmerlin##mt_opts:{it:mt_opts}})}{p_end}
 {synoptline}
-{p2colreset}{...}
 
-{synoptset 27}{...}
-{marker mt_opts}{...}
-{synopthdr:multiple timescale options}
+{synoptset 27 tabbed}{...}
+{synopthdr:mt_opts}
 {synoptline}
-{synopt :{opth offset(varname)}}defines the offset to be added to {cmd:_t} 
-to define the additional timescale{p_end}
-{synopt :{opth moffset(varname)}}defines the offset to be taken away 
-("minused") from {cmd:_t} to define the additional timescale{p_end}
-{synopt :{opth df(#)}}degrees of freedom for timescale spline function{p_end}
-{synopt :{opt knots(knots_list)}}knot locations for the timescale spline 
-function{p_end}
-{synopt :{opt time}}use splines of time rather than log time for 
-the timescale{p_end}
-{synopt :{opth tvc(varlist)}}time-dependent effects on the additional 
-timescale{p_end}
-{synopt :{opth dftvc(numlist)}}degrees of freedom for each time-dependent 
-effect{p_end}
-{synopt :{opt tvctime}}use splines of time rather than log time for 
-time-dependent effects{p_end}
-{synopt :{opt noorth:og}}turns off the default orthogonalisation of any 
-spline terms{p_end}
+{synopt :{opt df(#)}}degrees of freedom for the timescale spline{p_end}
+{synopt :{opth knots(numlist)}}knot locations (transformed scale); one of {opt df()}/{opt knots()} is required{p_end}
+{synopt :{opth offset(varname)}}added to {cmd:_t} to define the timescale (e.g. age at diagnosis for attained age){p_end}
+{synopt :{opth moffset(varname)}}subtracted from {cmd:_t} to define the timescale (resets the clock){p_end}
+{synopt :{opt time}}timescale spline in time rather than log time{p_end}
+{synopt :{opth tvc(varlist)}}covariates with time-varying effects on this timescale{p_end}
+{synopt :{opth dftvc(numlist)}}df for each such effect; required with {opt tvc()}{p_end}
+{synopt :{opt tvctime}}those effect splines in time rather than log time{p_end}
+{synopt :{opt noorthog}}do not orthogonalise this timescale's spline bases{p_end}
 {synoptline}
-{p2colreset}{...}
 
 
-{marker description}{...}
 {title:Description}
 
 {pstd}
-{cmd:stexcess} fits modelled excess survival models, using restricted cubic 
-splines on the log hazard scale. Multiple timescales can also be included. 
-Time-dependent effects can be specified using restricted cubic splines 
-through options, or in alternative ways using {helpb merlin}'s linear 
-predictor syntax. For predictions available post-estimation, see 
-{helpb stexcess postestimation}.
-{p_end}
+{cmd:stexcess} fits a relative-survival / excess-hazard model in which the
+expected (reference) rate is itself a fitted hazard model estimated from a
+control cohort, rather than taken from external population life tables. The
+reference and excess hazards are flexible parametric models -- restricted
+cubic splines on the log-hazard scale -- estimated jointly; the reference
+parameters are shared across the control records and the excess records'
+total hazard. The syntax follows the original (merlin-based) stexcess v1.
 
 {pstd}
-The {helpb merlin} command fits an extremely broad class of mixed effects 
-regression models for linear, non-linear and user-defined outcomes. For 
-full details and many tutorials, take a look at the accompanying 
-website: {browse "https://reddooranalytics.se/products/merlin":{bf:reddooranalytics.se/products/merlin}}.
-{p_end}
+Estimation runs entirely inside Stata: the designs are built once in Mata and
+maximised with Mata's {helpb mf_optimize:optimize()} -- the Newton-Raphson
+engine underneath {helpb ml} -- using an exact analytic log likelihood,
+gradient and Hessian. Predictions and standardisation use analytic
+delta-method Jacobians. There are no dependencies outside Stata.
+
+{pstd}
+By default both components are estimated jointly by maximum likelihood, so
+patient (excess) records also contribute information about the reference
+hazard. With {opt twostage} the reference model is instead fitted to the
+control records only (stage 1) and the excess model is then fitted to the
+patient records with the reference parameters held fixed (stage 2), analogous
+to supplying a known background hazard. This insulates the reference fit from
+any misspecification of the excess model. Standard errors come from a stacked
+M-estimation sandwich variance that propagates stage-1 uncertainty into the
+excess parameters; all postestimation (CIs, standardisation, contrasts) uses
+this joint variance automatically.
 
 
-{marker options}{...}
-{title:Options}
+{title:Timescales and knots}
 
-{dlgtab:Main}
+{pstd}
+Each component's baseline is a restricted cubic spline in log time (or time,
+with {opt time}), optionally shifted by {opt offset()}/{opt moffset()} before
+the transform. {cmd:time2()}-{cmd:time5()} add further timescales as splines
+in {cmd:_t} {it:+ offset - moffset}, each on its own log or natural scale --
+e.g. {cmd:time2(df(3) offset(agediag))} adds an attained-age timescale when
+age at diagnosis is in {cmd:agediag}. Time-varying effects are covariate x
+spline interactions on the relevant timescale; main-timescale {opt tvc()}
+splines are functions of {cmd:_t} alone (no offset), matching v1.
 
-{phang}
-{opt indicator(varname)} an indicator variable that must be coded 
-as 0 for control observations and 1 for excess observations.
-{p_end}
-
-{phang}
-{opt chintpoints(varname)} defines the number of Gauss-Legendre 
-quadrature points used when calculating the total cumulative hazard function. 
-A higher number of quadrature points increases the accuracy, but is 
-computationally slower.
-{p_end}
-
-{phang}
-{opt eform} displays exponentiated coefficients for the main linear 
-predictors.
-{p_end}
-
-{phang}
-{it:maximize_opts} control the maxi`ation process.
-{p_end}
-
-{phang}
-{it:display_opts} display options.
-{p_end}
-
-{marker model_options}{...}
-{dlgtab:Model options}
-
-{phang}{opt noconstant} suppresses the constant (intercept) term in the linear predictor.
-
-{phang}{opt df(#)} degrees of freedom for the baseline log [cumulative] hazard function, i.e. number of restricted cubic 
-spline terms when using {cmd:distribution(rp)} or {cmd:distribution(rcs)}. Internal knots are placed at centiles of the 
-event times. Boundary knots are placed at the minimum and maximum event times.
-
-{phang}{opt knots(knots_list)} either:
-
-{phang2}defines the knot locations for the spline functions used to model the baseline 
-log [cumulative] hazard function when using {cmd:distribution(rp)} or {cmd:distribution(rcs)}. Must include boundary 
-knots. Knots should be specified in increasing order.
-
-{phang2}defines the knot locations (cut-points) of the baseline function for {cmd:distribution(pwexponential)}. Knots should 
-be specified in increasing order.
-
-{phang}
-{opt offset(varname)} defines the offset to be added to {cmd:_t} to define the baseline timescale.
-
-{phang}
-{opt moffset(varname)} defines the offset to be taken away ("minused") from {cmd:_t} to define the baseline timescale.
-
-{phang}{opt tvc(varlist)} specifies the variables that have time-dependent effects. Time-dependent effects are fitted 
-using restricted cubic splines of time or log time (the default). The degrees of freedom are specified using the 
-{cmd:dftvc()} option. Note, {cmd:tvc()}s are not supported with generalised gamma, log normal or log logistic models.
-
-{phang}{opt dftvc(numlist)} degrees of freedom for the time-dependent effects specified in {cmd:tvc()}. If only one number is 
-specified, then the same degrees of freedom are applied to all {cmd:tvc()}s, otherwise, a number must be specified for each.
-
-{phang}{opt tvctime} specified that restricted cubic splines of time are used to model time-dependent effects, rather than 
-the default of log time.
-
-{phang}{opt noorthog} suppresses orthogonal transformation of spline variables.
-
-{marker multitime_details}{...}
-{dlgtab:Multiple timescales}
-
-{phang}
-{opt offset(varname)} defines the offset to be added to {cmd:_t} to define the additional timescale. If time since diagnosis was the main timescale, and you wish to add attained age as a second timescale, the {cmd:offset()} would contain age at diagnosis.
-
-{phang}
-{opt moffset(varname)} defines the offset to be taken away ("minused") from {cmd:_t} to define the additional timescale, i.e. to reset the clock.
-
-{phang}{opt df(#)} degrees of freedom for the additional timescale function, i.e. number of restricted cubic 
-spline terms. Internal knots are placed at centiles of the event times. Boundary knots are placed at the minimum and maximum event times.
-
-{phang}{opt knots(knots_list)} defines the knot locations for the spline functions used to model the additional timescale. Must include 
-boundary knots. Knots should be specified in increasing order.
-
-{phang}{opt time} specifies that restricted cubic splines of time are used to model the additional timescale, rather than the default of log time.
-
-{phang}{opt tvc(varlist)} specifies the variables that have time-dependent effects on the additional timescale. Time-dependent effects 
-are fitted using restricted cubic splines of time or log time (the default). The degrees of freedom are specified using the 
-{cmd:dftvc()} option. Note, {cmd:tvc()}s are not supported with generalised gamma, log normal or log logistic models.
-
-{phang}{opt dftvc(numlist)} degrees of freedom for the time-dependent effects specified in {cmd:tvc()}. If only one number is 
-specified, then the same degrees of freedom are applied to all {cmd:tvc()}s, otherwise, a number must be specified for each.
-
-{phang}{opt tvctime} specified that restricted cubic splines of time are used to model time-dependent effects on the additional timescale, 
-rather than the default of log time.
-
-{phang}{opt noorthog} suppresses orthogonal transformation of spline variables (additional timescale and any time-dependent effects).
+{pstd}
+Knots in any {opt knots()} option are on the {bf:transformed} scale of that
+spline (log scale unless {opt time} is given), in ascending order, and
+include the two boundary knots, so a spline with {it:df} degrees of freedom
+has {it:df}+1 knots. Explicit knots override df-based placement. This is the
+same scale and format in which the original merlin-based {cmd:stexcess}
+stores its knots (e.g. {cmd:e(knots_1_2_1)}), so those can be passed straight
+through to reproduce a v1 fit. Default knot siting differs from v1 in two
+small ways: knots are placed by interpolated (rather than rounded
+order-statistic) centiles, and the excess component's knots are sited from
+patient ({it:indicator} = 1) events only, whereas v1 uses all events --
+explicit knots are how v1 fits are reproduced exactly. The knots actually
+used are stored in {cmd:e(knotsref)}, {cmd:e(knotsexc)} and, for additional
+timescales, {cmd:e(knotsref_t}{it:#}{cmd:)} / {cmd:e(knotsexc_t}{it:#}{cmd:)}.
 
 
 {title:Examples}
 
-{phang}Fit a flexible parametric excess hazard model:{p_end}
-{cmd:    . use simdata, clear}
-{cmd:    . stset stime, failure(died)}
-{cmd:    . stmerlin (age sex, df(3))(age sex, df(2)), indicator(cancer)}
+{phang}{cmd:. stset survtime, failure(died)}{p_end}
+{phang}{cmd:. stexcess (age sex, df(3))(age sex, df(3)), indicator(patient)}{p_end}
+{phang}{cmd:. predict h, hazard ci}{p_end}
+{phang}{cmd:. predict s, netsurvival ci at(age 60)}{p_end}
 
-{phang}Model time-dependent effects:{p_end}
-{cmd:    . stmerlin (age sex, df(3) tvc(age) dftvc(1))}
-{cmd:               (age sex, df(2)), indicator(cancer)}
+{phang}A time-varying excess effect of age:{p_end}
+{phang}{cmd:. stexcess (age, df(3))(age, df(3) tvc(age) dftvc(2)), indicator(patient)}{p_end}
+
+{phang}Attained age as an additional reference timescale:{p_end}
+{phang}{cmd:. stexcess (age, df(3) time2(df(3) offset(agediag)))(age, df(3)), indicator(patient)}{p_end}
+
+
+{title:Postestimation}
+
+{pstd}See {help stexcess_postestimation:stexcess postestimation}.
+
+
+{title:Stored results}
+
+{synoptset 18 tabbed}{...}
+{p2col 5 18 22 2: Scalars}{p_end}
+{synopt:{cmd:e(N)}}number of observations{p_end}
+{synopt:{cmd:e(N_ref)}}number of reference (control) records{p_end}
+{synopt:{cmd:e(N_exc)}}number of excess (patient) records{p_end}
+{synopt:{cmd:e(ll)}}log likelihood{p_end}
+{synopt:{cmd:e(k)}}number of parameters{p_end}
+{synopt:{cmd:e(dfref)}, {cmd:e(dfexc)}}baseline spline df{p_end}
+{synopt:{cmd:e(chintpoints)}}quadrature nodes{p_end}
+{synopt:{cmd:e(converged)}}1 if the optimiser converged{p_end}
+{p2col 5 18 22 2: Macros}{p_end}
+{synopt:{cmd:e(cmd)}}{cmd:stexcess}{p_end}
+{synopt:{cmd:e(cmdline)}}command as typed{p_end}
+{synopt:{cmd:e(method)}}{cmd:joint} or {cmd:twostage}{p_end}
+{synopt:{cmd:e(indicator)}}excess indicator variable{p_end}
+{synopt:{cmd:e(refvars)}, {cmd:e(excvars)}}covariates in each equation{p_end}
+{synopt:{cmd:e(knotsref)}, {cmd:e(knotsexc)}}baseline knots used (transformed scale){p_end}
+{synopt:{cmd:e(knotsref_t}{it:#}{cmd:)}, {cmd:e(knotsexc_t}{it:#}{cmd:)}}additional-timescale knots used{p_end}
+{synopt:{cmd:e(atvars)}}variables that may appear in predict's {cmd:at()} options{p_end}
+{p2col 5 18 22 2: Matrices}{p_end}
+{synopt:{cmd:e(b)}}coefficient vector ({cmd:ref:} and {cmd:exc:} equations){p_end}
+{synopt:{cmd:e(V)}}variance-covariance matrix{p_end}
 
 
 {title:Author}
 
-{p 5 12 2}
-{bf:Michael J. Crowther}{p_end}
-{p 5 12 2}
-Red Door Analytics AB{p_end}
-{p 5 12 2}
-Stockholm, Sweden{p_end}
-{p 5 12 2}
-michael@reddooranalytics.se{p_end}
-{p 5 12 2}
-{browse "https://reddooranalytics.se":{bf:reddooranalytics.se}}
+{p 5 12 2}{bf:Michael J. Crowther}{p_end}
+{p 5 12 2}Red Door Analytics AB{p_end}
+{p 5 12 2}Stockholm, Sweden{p_end}
+{p 5 12 2}michael.crowther@reddooranalytics.se{p_end}
