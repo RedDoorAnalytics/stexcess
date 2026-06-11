@@ -20,4 +20,5 @@ f ado/stexcess_p.ado
 f ado/lstexcess.mlib
 f help/stexcess.sthlp
 f help/stexcess_postestimation.sthlp
+f data/stexcess_example.dta
 e

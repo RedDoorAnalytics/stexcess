@@ -135,16 +135,34 @@ timescales, {cmd:e(knotsref_t}{it:#}{cmd:)} / {cmd:e(knotsexc_t}{it:#}{cmd:)}.
 
 {title:Examples}
 
-{phang}{cmd:. stset survtime, failure(died)}{p_end}
-{phang}{cmd:. stexcess (age sex, df(3))(age sex, df(3)), indicator(patient)}{p_end}
-{phang}{cmd:. predict h, hazard ci}{p_end}
-{phang}{cmd:. predict s, netsurvival ci at(age 60)}{p_end}
+{pstd}The examples use the package's simulated dataset: a cancer cohort
+with matched population controls and 5-year follow-up. It loads from
+GitHub below; {cmd:net get stexcess} downloads a local copy.{p_end}
 
-{phang}A time-varying excess effect of age:{p_end}
-{phang}{cmd:. stexcess (age, df(3))(age, df(3) tvc(age) dftvc(2)), indicator(patient)}{p_end}
+{phang2}{stata `"use https://raw.githubusercontent.com/RedDoorAnalytics/stexcess/main/data/stexcess_example.dta, clear"':. use stexcess_example.dta, clear  (from GitHub)}{p_end}
+{phang2}{stata "stset stime, failure(died)":. stset stime, failure(died)}{p_end}
 
-{phang}Attained age as an additional reference timescale:{p_end}
-{phang}{cmd:. stexcess (age, df(3) time2(df(3) offset(agediag)))(age, df(3)), indicator(patient)}{p_end}
+{pstd}Joint flexible parametric excess hazard model{p_end}
+
+{phang2}{stata "stexcess (age female, df(3))(age female, df(3)), indicator(patient)":. stexcess (age female, df(3))(age female, df(3)), indicator(patient)}{p_end}
+
+{pstd}Stage effects on the excess hazard, via factor variables{p_end}
+
+{phang2}{stata "stexcess (age female, df(3))(age female i.stage, df(3)), indicator(patient)":. stexcess (age female, df(3))(age female i.stage, df(3)), indicator(patient)}{p_end}
+
+{pstd}A time-varying excess effect of age{p_end}
+
+{phang2}{stata "stexcess (age female, df(3))(age female, df(3) tvc(age) dftvc(2)), indicator(patient)":. stexcess (age female, df(3))(age female, df(3) tvc(age) dftvc(2)), indicator(patient)}{p_end}
+
+{pstd}Attained age as an additional reference timescale (age at diagnosis
+enters as the offset, so the timescale is age + follow-up time){p_end}
+
+{phang2}{stata "stexcess (female, df(3) time2(df(3) offset(age)))(age female, df(3)), indicator(patient)":. stexcess (female, df(3) time2(df(3) offset(age)))(age female, df(3)), indicator(patient)}{p_end}
+
+{pstd}Two-stage estimation: reference fitted to the controls only, with a
+stacked sandwich variance{p_end}
+
+{phang2}{stata "stexcess (age female, df(3))(age female, df(3)), indicator(patient) twostage":. stexcess (age female, df(3))(age female, df(3)), indicator(patient) twostage}{p_end}
 
 
 {title:Postestimation}

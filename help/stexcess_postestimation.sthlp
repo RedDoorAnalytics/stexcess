@@ -111,12 +111,33 @@ CIF and RMST-type statistics 0).
 
 {title:Examples}
 
-{phang}Total and net survival for a patient aged 60:{p_end}
-{phang2}{cmd:. predict s_all, survival at(age 60 patient 1) ci}{p_end}
-{phang2}{cmd:. predict s_net, netsurvival at(age 60) ci}{p_end}
+{pstd}Setup, using the simulated dataset shipped with the package{p_end}
 
-{phang}Relative survival ratio (total vs reference) at age 60:{p_end}
-{phang2}{cmd:. predict rsr, sratio at1(age 60 patient 1) at2(age 60 patient 0) ci}{p_end}
+{phang2}{stata `"use https://raw.githubusercontent.com/RedDoorAnalytics/stexcess/main/data/stexcess_example.dta, clear"':. use stexcess_example.dta, clear  (from GitHub)}{p_end}
+{phang2}{stata "stset stime, failure(died)":. stset stime, failure(died)}{p_end}
+{phang2}{stata "stexcess (age female, df(3))(age female i.stage, df(3)), indicator(patient)":. stexcess (age female, df(3))(age female i.stage, df(3)), indicator(patient)}{p_end}
 
-{phang}Standardised excess hazard over the patient covariate distribution:{p_end}
-{phang2}{cmd:. predict eh, excesshazard standardise timevar(tt) ci}{p_end}
+{pstd}Hazard and net survival, observed covariates and arm{p_end}
+
+{phang2}{stata "predict h, hazard ci":. predict h, hazard ci}{p_end}
+{phang2}{stata "predict sn, netsurvival ci":. predict sn, netsurvival ci}{p_end}
+
+{pstd}Net survival for a 70-year-old woman with stage III disease, on a
+time grid{p_end}
+
+{phang2}{stata "range tt 0 5 100":. range tt 0 5 100}{p_end}
+{phang2}{stata "predict sn3, netsurvival at(age 70 female 1 stage 3) timevar(tt) ci":. predict sn3, netsurvival at(age 70 female 1 stage 3) timevar(tt) ci}{p_end}
+{phang2}{stata "line sn3 sn3_lci sn3_uci tt, sort":. line sn3 sn3_lci sn3_uci tt, sort}{p_end}
+
+{pstd}Marginal (standardised) all-cause survival had everyone been a
+patient, averaged over the observed covariate distribution{p_end}
+
+{phang2}{stata "predict ms, survival standardise timevar(tt) ci at(patient 1)":. predict ms, survival standardise timevar(tt) ci at(patient 1)}{p_end}
+
+{pstd}Relative survival ratio (total vs reference) for 70-year-old men{p_end}
+
+{phang2}{stata "predict rsr, sratio at1(age 70 female 0 patient 1) at2(age 70 female 0 patient 0) timevar(tt) ci":. predict rsr, sratio at1(age 70 female 0 patient 1) at2(age 70 female 0 patient 0) timevar(tt) ci}{p_end}
+
+{pstd}Standardised excess hazard{p_end}
+
+{phang2}{stata "predict eh, excesshazard standardise timevar(tt) ci":. predict eh, excesshazard standardise timevar(tt) ci}{p_end}

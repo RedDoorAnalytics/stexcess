@@ -45,17 +45,21 @@ net install stexcess, from("https://raw.githubusercontent.com/RedDoorAnalytics/s
 
 ## Getting started
 
+Using the package's simulated example data (a cancer cohort with matched
+population controls; `net get stexcess` downloads a local copy):
+
 ```stata
-stset survtime, failure(died)
-stexcess (age sex, df(3))(age sex, df(3)), indicator(patient)
+use https://raw.githubusercontent.com/RedDoorAnalytics/stexcess/main/data/stexcess_example.dta, clear
+stset stime, failure(died)
+stexcess (age female, df(3))(age female i.stage, df(3)), indicator(patient)
 
 predict h,  hazard ci                       // observed covariates + arm
-predict sn, netsurvival ci at(age 60)       // net survival, age 60
+predict sn, netsurvival ci                  // net survival, observed covariates
 
-range tt 0 10 100
+range tt 0 5 100
 predict ms, survival standardise timevar(tt) ci at(patient 1)
-predict rsr, sratio at1(age 60 patient 1) at2(age 60 patient 0) ///
-    timevar(tt) ci                          // relative survival ratio
+predict rsr, sratio at1(age 70 female 0 patient 1) ///
+    at2(age 70 female 0 patient 0) timevar(tt) ci   // relative survival ratio
 ```
 
 See `help stexcess` and `help stexcess postestimation` for the full syntax.
