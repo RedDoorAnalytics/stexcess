@@ -52,13 +52,6 @@ local rv `e(refvars)'
 assert !`: list posof "one" in rv'
 rcof "stexcess (age, df(2) tvc(one) dftvc(1))(age, df(2)), indicator(excess)" == 459
 
-// ---- weights are rejected ----
-preserve
-stset t [pw=w], failure(d)
-rcof "stexcess (age, df(2))(age, df(2)), indicator(excess)" == 101
-restore
-stset t, failure(d)
-
 // ---- predict validation ----
 stexcess (age, df(2))(age, df(2)), indicator(excess)
 rcof "predict z1, hazard survival" == 198            // two statistics

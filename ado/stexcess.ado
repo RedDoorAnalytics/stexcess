@@ -70,11 +70,10 @@ program Estimate, eclass
     }
 
     // ---- sample / requirements ----
-    if `"`: char _dta[st_w]'"' != "" {
-        di as err "stexcess does not support weights " ///
-            `"(data are stset with `: char _dta[st_w]')"'
-        exit 101
-    }
+    // weights come from stset (fweights, iweights or pweights), which has
+    // already required them to be positive and fweights to be integers
+    local wtype : char _dta[st_wt]
+    local wvar  : char _dta[st_wv]
     marksample touse
     foreach c in ref exc {
         local `c'und ""
@@ -83,7 +82,7 @@ program Estimate, eclass
             local `c'und `r(varlist)'
         }
     }
-    markout `touse' _t _d `indicator' `refund' `excund'
+    markout `touse' _t _d `indicator' `refund' `excund' `wvar'
     foreach c in ref exc {
         foreach j of local `c'tslist {
             markout `touse' ``c'_ts`j'_off' ``c'_ts`j'_moff' ``c'_ts`j'_tvc'
@@ -99,11 +98,25 @@ program Estimate, eclass
             "or 1 (excess) on the estimation sample"
         exit 450
     }
-    qui count if `indicator' == 0 & `touse'
-    local nref = r(N)
-    local nexc = `nobs' - `nref'
-    qui count if _d == 1 & `touse'
-    local nfail = r(N)
+    // record counts follow streg: weighted everywhere, with e(N) the sum of
+    // the weights under fweights and the physical count otherwise
+    if "`wvar'" == "" {
+        qui count if `indicator' == 0 & `touse'
+        local nref = r(N)
+        local nexc = `nobs' - `nref'
+        qui count if _d == 1 & `touse'
+        local nfail = r(N)
+    }
+    else {
+        qui su `wvar' if `touse', meanonly
+        local wsum = r(sum)
+        qui su `wvar' if `indicator' == 0 & `touse', meanonly
+        local nref = r(sum)
+        local nexc = `wsum' - `nref'
+        qui su `wvar' if _d == 1 & `touse', meanonly
+        local nfail = r(sum)
+        if "`wtype'" == "fweight" local nobs = `wsum'
+    }
     qui count if `indicator' == 1 & _d == 1 & `touse'
     if r(N) == 0 {
         di as err "no events among excess (indicator = 1) records"
@@ -173,6 +186,8 @@ program Estimate, eclass
     local _stx_touse   `touse'
     local _stx_from    `from'
     local _stx_nolog   `log'
+    local _stx_wvar    `wvar'
+    local _stx_wtype   `wtype'
     local _stx_iterate `iterate'
     local _stx_ptol    `tolerance'
     local _stx_vtol    `ltolerance'
@@ -249,11 +264,15 @@ program Estimate, eclass
     ereturn local  atvars    "`atvars'"
     ereturn local  zerovars  "`zerovars'"
     ereturn local  method    = cond("`twostage'" != "", "twostage", "joint")
-    if "`twostage'" != "" {
+    if "`twostage'" != "" | "`wtype'" == "pweight" {
         ereturn local vce     "robust"
         ereturn local vcetype "Robust"
     }
     else ereturn local vce "oim"
+    if "`wvar'" != "" {
+        ereturn local wtype "`wtype'"
+        ereturn local wexp  `"= `wvar'"'
+    }
     ereturn local  title     "Modelled excess hazard model"
     local mnotok Hazard CHazard LOGCHazard SURVival CIF RMST TIMELost ///
         NETSurvival EXCesshazard RMSTNet HDIFFerence SDIFFerence ///
@@ -278,9 +297,9 @@ program Display
     di ""
     di as txt "`e(title)'" ///
         _col(49) as txt "Number of obs     =" as res %10.0fc e(N)
-    di _col(49) as txt "No. of failures   =" as res %10.0fc e(N_fail)
-    di _col(49) as txt "Reference records =" as res %10.0fc e(N_ref)
-    di _col(49) as txt "Excess records    =" as res %10.0fc e(N_exc)
+    di _col(49) as txt "No. of failures   =" as res %10.0gc e(N_fail)
+    di _col(49) as txt "Reference records =" as res %10.0gc e(N_ref)
+    di _col(49) as txt "Excess records    =" as res %10.0gc e(N_exc)
     di as txt "Log likelihood = " as res %10.0g e(ll)
     if "`e(method)'" == "twostage" {
         di as txt "Two-stage estimation: reference fitted to controls " ///

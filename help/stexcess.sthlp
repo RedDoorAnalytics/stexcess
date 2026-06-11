@@ -18,8 +18,12 @@
 
 {phang3}[{varlist}] [{cmd:,} {it:model_options}]{p_end}
 
-{phang2}The data must be {help stset} (without weights, which are not
-supported). {it:varlist} may contain factor variables and interactions
+{phang2}The data must be {help stset}. Weights are taken from the
+{cmd:stset} specification: {cmd:fweight}s reproduce the expanded dataset
+exactly (including default knot placement), {cmd:pweight}s give
+design-consistent estimates with a robust (sandwich) variance, and
+{cmd:iweight}s weight the log likelihood with a model-based variance.
+{it:varlist} may contain factor variables and interactions
 (e.g. {cmd:i.stage} or {cmd:c.age##i.sex}); base and omitted levels are
 shown in the coefficient table with zero coefficients. Factor variables are
 not allowed inside {opt tvc()} or as offset variables.{p_end}
@@ -192,7 +196,8 @@ stacked sandwich variance{p_end}
 {synopt:{cmd:e(title)}}title in estimation output{p_end}
 {synopt:{cmd:e(method)}}{cmd:joint} or {cmd:twostage}{p_end}
 {synopt:{cmd:e(vce)}}{cmd:oim} or {cmd:robust}{p_end}
-{synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage}{p_end}
+{synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage} or {cmd:pweight}s{p_end}
+{synopt:{cmd:e(wtype)}, {cmd:e(wexp)}}weight type and variable, when stset with weights{p_end}
 {synopt:{cmd:e(indicator)}}excess indicator variable{p_end}
 {synopt:{cmd:e(refvars)}, {cmd:e(excvars)}}covariates in each equation{p_end}
 {synopt:{cmd:e(knotsref)}, {cmd:e(knotsexc)}}baseline knots used (transformed scale){p_end}

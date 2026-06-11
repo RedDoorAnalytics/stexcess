@@ -51,6 +51,7 @@ struct _stx_comp {                // one hazard component (reference or excess)
 struct _stx_model {               // fitted model, stored for postestimation
     struct _stx_comp scalar ref, exc
     string scalar indvar          // excess indicator variable name
+    string scalar wvar, wtype     // stset weights ("" if none)
     real rowvector b              // included parameters only
     real matrix V                 //   "
     real rowvector bsel           // their column positions within e(b),
@@ -108,21 +109,44 @@ real matrix _stx_gl(real scalar G)
 }
 
 // knots at equally spaced centiles of the (transformed) event values
-// (numpy.percentile with linear interpolation, as in splines.default_knots)
-real colvector _stx_knots(real colvector v, real scalar df)
+// (numpy.percentile with linear interpolation, as in splines.default_knots).
+// With weights, positions are taken in the expanded order-statistic space
+// (cumulative weights), so integer fweights match the expanded data exactly
+real colvector _stx_knots(real colvector v, real scalar df,
+    | real colvector wt)
 {
-    real colvector s, out
-    real scalar n, j, pos, lo, f
+    real colvector s, w, cw, out
+    real matrix sv
+    real scalar n, j, pos, lo, f, W, vlo, vhi
 
     if (rows(v) == 0) _stx_error(2000, "no events to site spline knots")
-    s = sort(v, 1)
-    n = rows(s)
+    if (args() < 3 | rows(wt) == 0) {
+        s = sort(v, 1)
+        n = rows(s)
+        out = J(df + 1, 1, .)
+        for (j = 0; j <= df; j++) {
+            pos = (n - 1) * (j / df)
+            lo  = floor(pos)
+            f   = pos - lo
+            out[j + 1] = (lo + 1 >= n ? s[n]
+                : s[lo + 1] + f * (s[lo + 2] - s[lo + 1]))
+        }
+        return(out)
+    }
+    sv = sort((v, wt), 1)
+    s  = sv[., 1]
+    w  = sv[., 2]
+    cw = runningsum(w)
+    W  = cw[rows(cw)]
     out = J(df + 1, 1, .)
     for (j = 0; j <= df; j++) {
-        pos = (n - 1) * (j / df)
+        pos = (W - 1) * (j / df)
         lo  = floor(pos)
         f   = pos - lo
-        out[j + 1] = (lo + 1 >= n ? s[n] : s[lo + 1] + f * (s[lo + 2] - s[lo + 1]))
+        // expanded element at 0-based index i is s[min{j : cw[j] > i}]
+        vlo = s[sum(cw :<= lo) + 1]
+        vhi = (lo + 1 >= W ? s[rows(s)] : s[sum(cw :<= lo + 1) + 1])
+        out[j + 1] = vlo + f * (vhi - vlo)
     }
     return(out)
 }
@@ -164,14 +188,17 @@ real matrix _stx_rcsbasis(real colvector x, real colvector k)
 }
 
 // economy-QR orthogonalisation factor of [1, rcs], positive diagonal;
-// x is already on the spec's transformed scale
-real matrix _stx_orthogR(real colvector x, real colvector kn)
+// x is already on the spec's transformed scale. With weights the rows are
+// sqrt(w)-scaled, which reproduces the QR of fweight-expanded data
+real matrix _stx_orthogR(real colvector x, real colvector kn,
+    | real colvector wt)
 {
     real matrix B1, H, R1
     real rowvector tau
     real colvector s
 
     B1 = (J(rows(x), 1, 1), _stx_rcsbasis(x, kn))
+    if (args() == 3 & rows(wt)) B1 = sqrt(wt) :* B1
     H = .
     tau = .
     R1 = .
@@ -314,10 +341,13 @@ real rowvector _stx_bsel(struct _stx_comp scalar C, real scalar off)
     return(sel)
 }
 
-// event design + record-major stacked quadrature design over (t0, t]
+// event design + record-major stacked quadrature design over (t0, t];
+// wrec are record weights (stset weights at fit time, 1 otherwise), folded
+// into the per-record quadrature weights
 void _stx_qdesign(real colvector t, real colvector t0, real matrix X,
     real matrix OFF, struct _stx_comp scalar C, real colvector nd,
-    real colvector w, real matrix Dev, real matrix Wq, real colvector cw)
+    real colvector w, real colvector wrec, real matrix Dev, real matrix Wq,
+    real colvector cw)
 {
     real matrix U
     real colvector half
@@ -330,7 +360,7 @@ void _stx_qdesign(real colvector t, real colvector t0, real matrix X,
     U = (0.5 :* (t + t0)) :+ half * nd'
     Wq = _stx_cols(C, vec(U'),
         (cols(X) ? X # J(G, 1, 1) : J(n * G, 0, 0)), OFF # J(G, 1, 1))
-    cw = half # w
+    cw = (wrec :* half) # w
 }
 
 // per-record sums over each record's G quadrature rows (missing propagates,
@@ -396,15 +426,16 @@ real matrix _stx_offmat(struct _stx_comp scalar C, string scalar touse,
 // factor uses the same sample.
 void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
     string scalar touse, real colvector t, real colvector evmask,
-    string scalar what)
+    real colvector wt, string scalar what)
 {
     string scalar p, kn_s
     string rowvector tsnums
-    real colvector t_ev, off, v_ev
+    real colvector t_ev, off, v_ev, w_ev
     real rowvector dftvc
     real scalar n, s, j, df
 
     n = rows(t)
+    w_ev = select(wt, evmask)
     C.covnames = tokens(st_local("_stx_" + tag + "vars"))
     C.covfull  = tokens(st_local("_stx_" + tag + "covfull"))
     C.covincl  = strtoreal(tokens(st_local("_stx_" + tag + "covincl")))
@@ -435,12 +466,12 @@ void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
         kn_s = st_local(p + "knots")
         df = strtoreal(st_local(p + "df"))
         v_ev = (C.ts[s].base.logs ? ln(t_ev) : t_ev)
-        C.ts[s].base.knots = (kn_s == "" ? _stx_knots(v_ev, df)
+        C.ts[s].base.knots = (kn_s == "" ? _stx_knots(v_ev, df, w_ev)
                                          : strtoreal(tokens(kn_s))')
         _stx_checkknots(C.ts[s].base.knots, what +
             (s > 1 ? " time" + tsnums[s] + "()" : "") + " baseline spline")
         C.ts[s].base.R = (st_local(p + "orthog") != "0"
-            ? _stx_orthogR(v_ev, C.ts[s].base.knots) : J(0, 0, .))
+            ? _stx_orthogR(v_ev, C.ts[s].base.knots, w_ev) : J(0, 0, .))
 
         C.ts[s].tvcnames = tokens(st_local(p + "tvc"))
         if (cols(C.ts[s].tvcnames)) {
@@ -451,11 +482,11 @@ void _stx_compspec(struct _stx_comp scalar C, string scalar tag,
                 // main-timescale tvc splines take no offset (v1 behaviour)
                 v_ev = (s == 1 ? select(t, evmask) : t_ev)
                 if (C.ts[s].tvcspecs[j].logs) v_ev = ln(v_ev)
-                C.ts[s].tvcspecs[j].knots = _stx_knots(v_ev, dftvc[j])
+                C.ts[s].tvcspecs[j].knots = _stx_knots(v_ev, dftvc[j], w_ev)
                 _stx_checkknots(C.ts[s].tvcspecs[j].knots, what + " tvc(" +
                     C.ts[s].tvcnames[j] + ") spline")
                 C.ts[s].tvcspecs[j].R = (st_local(p + "orthog") != "0"
-                    ? _stx_orthogR(v_ev, C.ts[s].tvcspecs[j].knots)
+                    ? _stx_orthogR(v_ev, C.ts[s].tvcspecs[j].knots, w_ev)
                     : J(0, 0, .))
                 if (!anyof(C.datnames, C.ts[s].tvcnames[j])) {
                     C.datnames = (C.datnames, C.ts[s].tvcnames[j])
@@ -653,6 +684,8 @@ void _stx_fit()
     transmorphic S, S2
     string scalar touse, fromname
     real colvector t, t0, d, ind, nd, w, cm, pm, eC, eR, eE, hr, he, pi, w2
+    real colvector wgt, wd, thr, the
+    real matrix Spr, Spe, Brob
     real matrix Xr, Xe, OFFr, OFFe, glm, Dev, Wq, V, A, B, Sc, Sp, Ainv
     real matrix A11, A21, A22
     real rowvector b0, b
@@ -668,6 +701,10 @@ void _stx_fit()
     d   = st_data(., st_local("_stx_d"), touse)
     ind = st_data(., st_local("_stx_ind"), touse)
     n   = rows(t)
+    M.wvar  = st_local("_stx_wvar")
+    M.wtype = st_local("_stx_wtype")
+    wgt = (M.wvar == "" ? J(n, 1, 1) : st_data(., M.wvar, touse))
+    wd  = wgt :* d
     twostage = st_local("_stx_twostage") == "1"
     trace = st_local("_stx_nolog") == ""
 
@@ -681,8 +718,8 @@ void _stx_fit()
     if (twostage & !sum(cm)) _stx_error(2000, "twostage requires reference (control) records")
 
     // component specs: ref knots from ALL events, exc from patient events
-    _stx_compspec(M.ref, "ref", touse, t, d :== 1, "reference")
-    _stx_compspec(M.exc, "exc", touse, t, (d :== 1) :& pm, "excess")
+    _stx_compspec(M.ref, "ref", touse, t, d :== 1, wgt, "reference")
+    _stx_compspec(M.exc, "exc", touse, t, (d :== 1) :& pm, wgt, "excess")
     _stx_checkts(M.ref, touse, t, t0, "reference")
     _stx_checkts(M.exc, touse, t, t0, "excess")
     M.indvar = st_local("_stx_ind")
@@ -712,26 +749,29 @@ void _stx_fit()
     Dev = .
     Wq = .
     cw = .
+    // weights enter the likelihood only through the per-record event
+    // multipliers (Cd/Pd = w*d) and quadrature weights (cw), so the d2
+    // evaluators and the two-stage sandwich are weight-correct as they stand
     _stx_qdesign(select(t, cm), select(t0, cm),
         (cols(Xr) ? select(Xr, cm) : J(sum(cm), 0, 0)), select(OFFr, cm),
-        M.ref, nd, w, Dev, Wq, cw)
+        M.ref, nd, w, select(wgt, cm), Dev, Wq, cw)
     D.CDev = Dev
     D.CWq  = Wq
     D.Ccw  = cw
-    D.Cd   = select(d, cm)
+    D.Cd   = select(wd, cm)
     _stx_qdesign(select(t, pm), select(t0, pm),
         (cols(Xr) ? select(Xr, pm) : J(sum(pm), 0, 0)), select(OFFr, pm),
-        M.ref, nd, w, Dev, Wq, cw)
+        M.ref, nd, w, select(wgt, pm), Dev, Wq, cw)
     D.RDev = Dev
     D.RWq  = Wq
     D.Rcw  = cw
     _stx_qdesign(select(t, pm), select(t0, pm),
         (cols(Xe) ? select(Xe, pm) : J(sum(pm), 0, 0)), select(OFFe, pm),
-        M.exc, nd, w, Dev, Wq, cw)
+        M.exc, nd, w, select(wgt, pm), Dev, Wq, cw)
     D.EDev = Dev
     D.EWq  = Wq
     D.Ecw  = cw
-    D.Pd   = select(d, pm)
+    D.Pd   = select(wd, pm)
     D.pr   = cols(D.CDev)
     pe = cols(D.EDev)
     k  = D.pr + pe
@@ -744,13 +784,15 @@ void _stx_fit()
     // crude exponential start values, or user-supplied from()
     b0 = J(1, k, 0)
     if (twostage) {
-        rate = max((sum(select(d, cm)) / sum(select(t - t0, cm)), 1e-4))
+        rate = max((sum(select(wd, cm)) /
+                    sum(select(wgt :* (t - t0), cm)), 1e-4))
     }
     else {
-        rate = max((sum(d) / sum(t - t0), 1e-4))
+        rate = max((sum(wd) / sum(wgt :* (t - t0)), 1e-4))
     }
     if (M.ref.cons) b0[D.pr] = ln(rate)
-    rate = max((sum(select(d, pm)) / sum(select(t - t0, pm)), 1e-4))
+    rate = max((sum(select(wd, pm)) /
+                sum(select(wgt :* (t - t0), pm)), 1e-4))
     if (M.exc.cons) b0[k] = ln(0.5 * rate)
     // bsel maps the included parameters into the full e(b) layout (which
     // also carries base/omitted factor-variable terms as zero coefficients)
@@ -785,6 +827,25 @@ void _stx_fit()
         ll = optimize_result_value(S)
         conv = optimize_result_converged(S)
         iter = optimize_result_iterations(S)
+
+        // pweights: robust sandwich A^-1 B A^-1 with B from the per-record
+        // weighted scores (the weights are already inside Cd/Pd/cw)
+        if (M.wtype == "pweight") {
+            thr = b[(1..D.pr)]'
+            the = b[((D.pr + 1)..k)]'
+            eC = D.Ccw :* exp(D.CWq * thr)
+            eR = D.Rcw :* exp(D.RWq * thr)
+            eE = D.Ecw :* exp(D.EWq * the)
+            pi = exp(D.RDev * thr) :/
+                 (exp(D.RDev * thr) + exp(D.EDev * the))
+            Sc  = D.Cd :* D.CDev - _stx_qsum(eC, D.CWq, G)
+            Spr = (D.Pd :* pi) :* D.RDev - _stx_qsum(eR, D.RWq, G)
+            Spe = (D.Pd :* (1 :- pi)) :* D.EDev - _stx_qsum(eE, D.EWq, G)
+            Brob = cross((Sc, J(rows(Sc), pe, 0) \ Spr, Spe),
+                         (Sc, J(rows(Sc), pe, 0) \ Spr, Spe))
+            V = V * Brob * V
+            V = 0.5 :* (V + V')
+        }
     }
     else {
         // stage 1: reference on controls; stage 2: excess with ref fixed
@@ -813,6 +874,13 @@ void _stx_fit()
         A = (A11, J(D.pr, pe, 0) \ A21, A22)
         Sc = D.Cd :* D.CDev - _stx_qsum(eC, D.CWq, G)
         Sp = (D.Pd :* (1 :- pi)) :* D.EDev - _stx_qsum(eE, D.EWq, G)
+        // the score rows carry one factor of the weights; pweights keep it
+        // squared (sum of (w s)(w s)'), fweights/iweights need the
+        // expanded-data sum of w s s'
+        if (M.wtype != "pweight" & M.wvar != "") {
+            Sc = Sc :/ sqrt(select(wgt, cm))
+            Sp = Sp :/ sqrt(select(wgt, pm))
+        }
         B = (cross(Sc, Sc), J(D.pr, pe, 0) \ J(pe, D.pr, 0), cross(Sp, Sp))
         Ainv = luinv(A)
         V = Ainv * B * Ainv'
@@ -971,7 +1039,8 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
     hr = Hr = J(m, 1, 0)
     Jr = J(m, pr, 0)
     if (needref) {
-        _stx_qdesign(times, zero, Xr, OFFr, M.ref, nd, w, rDev, rWq, rcw)
+        _stx_qdesign(times, zero, Xr, OFFr, M.ref, nd, w,
+            J(m, 1, 1), rDev, rWq, rcw)
         hr = exp(rDev * M.b[(1..pr)]')
         if (needH) {
             er = rcw :* exp(rWq * M.b[(1..pr)]')
@@ -979,7 +1048,8 @@ void _stx_rowquant(struct _stx_model scalar M, real colvector times,
             if (doJ) Jr = _stx_qsum(er, rWq, G)
         }
     }
-    _stx_qdesign(times, zero, Xe, OFFe, M.exc, nd, w, eDev, eWq, ecw)
+    _stx_qdesign(times, zero, Xe, OFFe, M.exc, nd, w,
+        J(m, 1, 1), eDev, eWq, ecw)
     he = exp(eDev * M.b[((pr + 1)..k)]')
     if (needH) {
         ee = ecw :* exp(eWq * M.b[((pr + 1)..k)]')
@@ -1246,8 +1316,9 @@ void _stx_std_comp(struct _stx_comp scalar C, real colvector th,
 // sum of the quantity (and its Jacobian) over a population chunk, per time
 void _stx_std_chunk(struct _stx_model scalar M, real colvector times,
     real matrix Xr, real matrix Xe, real matrix OFFr, real matrix OFFe,
-    real colvector ind, string scalar q, real colvector nd, real colvector w,
-    real scalar doJ, real colvector gsum, real matrix Jsum)
+    real colvector ind, real colvector wp, string scalar q,
+    real colvector nd, real colvector w, real scalar doJ,
+    real colvector gsum, real matrix Jsum)
 {
     real colvector thr, the, hr, he, Hr, He, vals, S
     real matrix Jhr, Jhe, JHr, JHe
@@ -1285,36 +1356,37 @@ void _stx_std_chunk(struct _stx_model scalar M, real colvector times,
             if (doJ) Jsum[j, .] = J(1, k, .)
             continue
         }
-        gsum[j] = gsum[j] + sum(vals)
+        gsum[j] = gsum[j] + sum(wp :* vals)
         if (!doJ) continue
 
         if (needh) {
             if (needref) {
-                Jsum[|j, 1 \ j, pr|] = Jsum[|j, 1 \ j, pr|] + colsum(Jhr)
+                Jsum[|j, 1 \ j, pr|] = Jsum[|j, 1 \ j, pr|] +
+                    colsum(wp :* Jhr)
                 Jsum[|j, pr + 1 \ j, k|] = Jsum[|j, pr + 1 \ j, k|] +
-                    colsum(ind :* Jhe)
+                    colsum((wp :* ind) :* Jhe)
             }
             else {
                 Jsum[|j, pr + 1 \ j, k|] = Jsum[|j, pr + 1 \ j, k|] +
-                    colsum(Jhe)
+                    colsum(wp :* Jhe)
             }
         }
         else if (q == "chazard") {
-            Jsum[|j, 1 \ j, pr|] = Jsum[|j, 1 \ j, pr|] + colsum(JHr)
+            Jsum[|j, 1 \ j, pr|] = Jsum[|j, 1 \ j, pr|] + colsum(wp :* JHr)
             Jsum[|j, pr + 1 \ j, k|] = Jsum[|j, pr + 1 \ j, k|] +
-                colsum(ind :* JHe)
+                colsum((wp :* ind) :* JHe)
         }
         else {                       // survival family: d exp(-H) = -S dH
             if (q == "cif") S = -S   // d cif = +S dH
             if (needref) {
                 Jsum[|j, 1 \ j, pr|] = Jsum[|j, 1 \ j, pr|] +
-                    colsum(-S :* JHr)
+                    colsum((-wp :* S) :* JHr)
                 Jsum[|j, pr + 1 \ j, k|] = Jsum[|j, pr + 1 \ j, k|] +
-                    colsum(-S :* (ind :* JHe))
+                    colsum((-wp :* S) :* (ind :* JHe))
             }
             else {
                 Jsum[|j, pr + 1 \ j, k|] = Jsum[|j, pr + 1 \ j, k|] +
-                    colsum(-S :* JHe)
+                    colsum((-wp :* S) :* JHe)
             }
         }
     }
@@ -1323,17 +1395,18 @@ void _stx_std_chunk(struct _stx_model scalar M, real colvector times,
 // standardised estimate over a population: averaged value + Jacobian
 void _stx_standest(struct _stx_model scalar M, real colvector times,
     real matrix Xrpop, real matrix Xepop, real matrix OFFrpop,
-    real matrix OFFepop, real colvector indpop, string scalar q,
-    real scalar G, real scalar chunk, real scalar doJ,
+    real matrix OFFepop, real colvector indpop, real colvector wpop,
+    string scalar q, real scalar G, real scalar chunk, real scalar doJ,
     real colvector est, real matrix Jc)
 {
     real matrix glm, Jsum
     real colvector nd, w, gsum
-    real scalar N, lo, hi, m, k
+    real scalar N, W, lo, hi, m, k
 
     m = rows(times)
     k = cols(M.b)
     N = rows(OFFrpop)
+    W = sum(wpop)
     glm = _stx_gl(G)
     nd = glm[., 1]
     w  = glm[., 2]
@@ -1345,10 +1418,10 @@ void _stx_standest(struct _stx_model scalar M, real colvector times,
             (cols(Xrpop) ? Xrpop[|lo, 1 \ hi, .|] : J(hi - lo + 1, 0, 0)),
             (cols(Xepop) ? Xepop[|lo, 1 \ hi, .|] : J(hi - lo + 1, 0, 0)),
             OFFrpop[|lo, 1 \ hi, .|], OFFepop[|lo, 1 \ hi, .|],
-            indpop[|lo \ hi|], q, nd, w, doJ, gsum, Jsum)
+            indpop[|lo \ hi|], wpop[|lo \ hi|], q, nd, w, doJ, gsum, Jsum)
     }
-    est = gsum :/ N
-    Jc = Jsum :/ N
+    est = gsum :/ W
+    Jc = Jsum :/ W
 }
 
 // ========================================================================= //
@@ -1486,7 +1559,7 @@ void _stx_standsurv(real scalar level)
 {
     struct _stx_model scalar M
     string scalar touse, pop, q
-    real colvector times, est, taus, half_out, Sflat, no, wo, ind
+    real colvector times, est, taus, half_out, Sflat, no, wo, ind, wpop
     real matrix Jc, Xr, Xe, OFFr, OFFe, glm, U, Jo
     real scalar doJ, m, Mo, j, npop
 
@@ -1502,6 +1575,7 @@ void _stx_standsurv(real scalar level)
     _stx_preddata(M, pop, npop,
         _stx_needind(q == "rmst" | q == "timelost" ? "survival" : q),
         Xr, Xe, OFFr, OFFe, ind)
+    wpop = (M.wvar == "" ? J(npop, 1, 1) : st_data(., M.wvar, pop))
     est = .
     Jc = .
 
@@ -1517,7 +1591,7 @@ void _stx_standsurv(real scalar level)
         U = half_out * (no :+ 1)'
         Sflat = .
         Jo = .
-        _stx_standest(M, vec(U'), Xr, Xe, OFFr, OFFe, ind,
+        _stx_standest(M, vec(U'), Xr, Xe, OFFr, OFFe, ind, wpop,
             (q == "rmstnet" ? "netsurv" : "survival"), 40, 4000, doJ,
             Sflat, Jo)
         est = half_out :* (colshape(Sflat, Mo) * wo)
@@ -1532,7 +1606,7 @@ void _stx_standsurv(real scalar level)
         _stx_stash(est, Jc, M, "log", level)
         return
     }
-    _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, q, 50, 4000, doJ,
+    _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, wpop, q, 50, 4000, doJ,
         est, Jc)
     _stx_stash(est, Jc, M, _stx_transform(q), level)
 }

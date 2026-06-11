@@ -84,7 +84,8 @@ differences).
 
 {pstd}
 {opt standardise} averages the requested statistic over the estimation-sample
-covariate distribution (the g-formula), with delta-method CIs. It may be
+covariate distribution (the g-formula), with delta-method CIs; when the data
+are stset with weights, the average is weighted accordingly. It may be
 combined with {opt at()}/{opt zeros}, which then pin selected variables
 across the whole population -- counterfactual standardisation. For example,
 after {cmd:stexcess (age)(age), indicator(patient)}:
