@@ -29,6 +29,10 @@ variables.{p_end}
 {synopt :{opt two:stage}}two-stage estimation with sandwich (robust) standard errors{p_end}
 {synopt :{opt chint:points(#)}}Gauss-Legendre nodes for cumulative hazards (default 30){p_end}
 {synopt :{opt from(matname)}}starting values (one column per model parameter){p_end}
+{synopt :{opt iter:ate(#)}}maximum number of Newton-Raphson iterations{p_end}
+{synopt :{opt tol:erance(#)}}coefficient-vector convergence tolerance{p_end}
+{synopt :{opt ltol:erance(#)}}log-likelihood convergence tolerance{p_end}
+{synopt :{opt nrtol:erance(#)}}scaled-gradient convergence tolerance{p_end}
 {synopt :{opt eform}}display exponentiated coefficients{p_end}
 {synopt :{opt nolog}}suppress the log-likelihood iteration log{p_end}
 {synopt :{opt level(#)}}confidence level{p_end}
@@ -153,15 +157,22 @@ timescales, {cmd:e(knotsref_t}{it:#}{cmd:)} / {cmd:e(knotsexc_t}{it:#}{cmd:)}.
 {synopt:{cmd:e(N)}}number of observations{p_end}
 {synopt:{cmd:e(N_ref)}}number of reference (control) records{p_end}
 {synopt:{cmd:e(N_exc)}}number of excess (patient) records{p_end}
+{synopt:{cmd:e(N_fail)}}number of failures{p_end}
 {synopt:{cmd:e(ll)}}log likelihood{p_end}
 {synopt:{cmd:e(k)}}number of parameters{p_end}
+{synopt:{cmd:e(df_m)}}model degrees of freedom (covariate coefficients){p_end}
+{synopt:{cmd:e(rank)}}rank of {cmd:e(V)}{p_end}
+{synopt:{cmd:e(ic)}}number of iterations{p_end}
 {synopt:{cmd:e(dfref)}, {cmd:e(dfexc)}}baseline spline df{p_end}
 {synopt:{cmd:e(chintpoints)}}quadrature nodes{p_end}
 {synopt:{cmd:e(converged)}}1 if the optimiser converged{p_end}
 {p2col 5 18 22 2: Macros}{p_end}
 {synopt:{cmd:e(cmd)}}{cmd:stexcess}{p_end}
 {synopt:{cmd:e(cmdline)}}command as typed{p_end}
+{synopt:{cmd:e(title)}}title in estimation output{p_end}
 {synopt:{cmd:e(method)}}{cmd:joint} or {cmd:twostage}{p_end}
+{synopt:{cmd:e(vce)}}{cmd:oim} or {cmd:robust}{p_end}
+{synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage}{p_end}
 {synopt:{cmd:e(indicator)}}excess indicator variable{p_end}
 {synopt:{cmd:e(refvars)}, {cmd:e(excvars)}}covariates in each equation{p_end}
 {synopt:{cmd:e(knotsref)}, {cmd:e(knotsexc)}}baseline knots used (transformed scale){p_end}

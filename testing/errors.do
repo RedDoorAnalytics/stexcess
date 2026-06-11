@@ -32,7 +32,7 @@ rcof "stexcess (age, df(2) time2(df(1) knots(0 1) offset(age)))(age, df(2)), ind
 rcof "stexcess (age, df(2))(age, df(2)), indicator(excess) chintpoints(0)" == 198
 
 // log of a non-positive timescale: t + offset <= 0 somewhere
-rcof "stexcess (age, df(2) time2(df(1) offset(bigneg)))(age, df(2)), indicator(excess)" == 3498
+rcof "stexcess (age, df(2) time2(df(1) offset(bigneg)))(age, df(2)), indicator(excess)" == 459
 
 // ---- sample validation ----
 gen byte ind3 = excess
@@ -77,13 +77,13 @@ stexcess (age, df(2))(age, df(2)), indicator(excess)
 estimates store first
 stexcess (age, df(3))(age, df(3)), indicator(excess)
 estimates restore first
-rcof "predict z10, hazard" == 3498                   // store holds the df(3) fit
+rcof "predict z10, hazard" == 301                   // store holds the df(3) fit
 estimates drop first
 
 stexcess (age, df(2))(age, df(2)), indicator(excess)
 clear mata                                            // wipes the model store
 mata: mata mlib index
-rcof "predict z11, hazard" == 3498
+rcof "predict z11, hazard" == 301
 stexcess (age, df(2))(age, df(2)), indicator(excess)  // refit -> predict works
 predict z12, hazard ci
 assert !missing(z12[1])

@@ -8,7 +8,7 @@
 *! maximised with optimize() -- the Newton-Raphson engine beneath ml -- using
 *! an exact analytic d2 evaluator. No dependencies outside Stata.
 
-program stexcess, eclass
+program stexcess, eclass properties(st)
     version 19.5
 
     if replay() {
@@ -34,6 +34,8 @@ program Estimate, eclass
     local 0 `"`stxglob_if' `stxglob_in', `stxglob_op'"'
     syntax [if] [in], INDicator(varname numeric) ///
         [ CHINTpoints(integer 30) TWOstage Level(cilevel) FROM(name) ///
+          ITERate(numlist max=1 integer >=0) TOLerance(numlist max=1 >0) ///
+          LTOLerance(numlist max=1 >0) NRTOLerance(numlist max=1 >0) ///
           EFORM noLOG DEBUG EVALtype(string) ]
     // debug and evaltype() are accepted for v1 compatibility; the Mata core
     // always uses its exact analytic d2 evaluator, so they are no-ops
@@ -93,6 +95,8 @@ program Estimate, eclass
     qui count if `indicator' == 0 & `touse'
     local nref = r(N)
     local nexc = `nobs' - `nref'
+    qui count if _d == 1 & `touse'
+    local nfail = r(N)
     qui count if `indicator' == 1 & _d == 1 & `touse'
     if r(N) == 0 {
         di as err "no events among excess (indicator = 1) records"
@@ -138,6 +142,10 @@ program Estimate, eclass
     local _stx_touse   `touse'
     local _stx_from    `from'
     local _stx_nolog   `log'
+    local _stx_iterate `iterate'
+    local _stx_ptol    `tolerance'
+    local _stx_vtol    `ltolerance'
+    local _stx_nrtol   `nrtolerance'
     foreach c in ref exc {
         local _stx_`c'vars   ``c'vars'
         local _stx_`c'_cons  ``c'cons'
@@ -148,26 +156,31 @@ program Estimate, eclass
             }
         }
     }
-    scalar _stx_nnodes = `chintpoints'
-    scalar _stx_twostage = ("`twostage'" != "")
+    local _stx_nnodes  `chintpoints'
+    local _stx_twostage = ("`twostage'" != "")
+    tempname b V
+    local _stx_bmat `b'
+    local _stx_Vmat `V'
 
     mata: _stx_fit()
 
     // ---- assemble e() and post ----
-    tempname b V
-    matrix `b' = _stx_b
-    matrix `V' = _stx_V
     local names `_stx_names'
     matrix colnames `b' = `names'
     matrix colnames `V' = `names'
     matrix rownames `V' = `names'
 
     ereturn post `b' `V', esample(`touse') obs(`nobs') depname(_t)
-    ereturn scalar ll        = _stx_ll
-    ereturn scalar k         = _stx_k
-    ereturn scalar converged = _stx_conv
-    ereturn scalar iterations = _stx_iter
+    ereturn scalar ll        = `_stx_ll'
+    ereturn scalar k         = `_stx_k'
+    ereturn scalar df_m     = `: word count `refvars'' + ///
+                              `: word count `excvars''
+    ereturn scalar converged = `_stx_conv'
+    ereturn scalar ic        = `_stx_iter'
+    ereturn scalar iterations = `_stx_iter'
     ereturn scalar chintpoints = `chintpoints'
+    mata: st_local("vrank", strofreal(rank(st_matrix("e(V)"))))
+    ereturn scalar rank      = `vrank'
     foreach c in ref exc {
         local dfb ``c'_ts1_df'
         if "`dfb'" == "" {
@@ -177,6 +190,7 @@ program Estimate, eclass
     }
     ereturn scalar N_ref     = `nref'
     ereturn scalar N_exc     = `nexc'
+    ereturn scalar N_fail    = `nfail'
     ereturn local  knotsref  "`_stx_kref'"
     ereturn local  knotsexc  "`_stx_kexc'"
     foreach c in ref exc {
@@ -188,6 +202,17 @@ program Estimate, eclass
     }
     ereturn local  atvars    "`_stx_atvars'"
     ereturn local  method    = cond("`twostage'" != "", "twostage", "joint")
+    if "`twostage'" != "" {
+        ereturn local vce     "robust"
+        ereturn local vcetype "Robust"
+    }
+    else ereturn local vce "oim"
+    ereturn local  title     "Modelled excess hazard model"
+    local mnotok Hazard CHazard LOGCHazard SURVival CIF RMST TIMELost ///
+        NETSurvival EXCesshazard RMSTNet HDIFFerence SDIFFerence ///
+        CIFDIFFerence RMSTDIFFerence HRatio SRatio CIFRatio RMSTRatio ///
+        STANDardise
+    ereturn local marginsnotok "`mnotok'"
     ereturn local  indicator "`indicator'"
     ereturn local  refvars   "`refvars'"
     ereturn local  excvars   "`excvars'"
@@ -196,9 +221,6 @@ program Estimate, eclass
     ereturn local  predict   "stexcess_p"
     ereturn local  cmd       "stexcess"
 
-    scalar drop _stx_nnodes _stx_twostage ///
-        _stx_ll _stx_N _stx_k _stx_conv _stx_iter
-    matrix drop _stx_b _stx_V
 
     Display, level(`level') `eform'
 end
@@ -206,15 +228,19 @@ end
 program Display
     syntax [, Level(cilevel) EFORM ]
     local eopt = cond("`eform'" != "", `"eform("exp(b)")"', "")
+    st_show
     di ""
-    di as txt "Modelled excess hazard model" ///
-        _col(50) as txt "Number of obs = " as res %9.0fc e(N)
+    di as txt "`e(title)'" ///
+        _col(49) as txt "Number of obs     =" as res %10.0fc e(N)
+    di _col(49) as txt "No. of failures   =" as res %10.0fc e(N_fail)
+    di _col(49) as txt "Reference records =" as res %10.0fc e(N_ref)
+    di _col(49) as txt "Excess records    =" as res %10.0fc e(N_exc)
     di as txt "Log likelihood = " as res %10.4f e(ll)
     if "`e(method)'" == "twostage" {
-        di as txt "Two-stage estimation: reference fitted to controls only; " ///
-            "sandwich (robust) std. err."
+        di as txt "Two-stage estimation: reference fitted to controls " ///
+            "only; stacked sandwich variance."
     }
-    if e(converged) == 0 di as err "warning: optimizer did not converge"
+    if e(converged) == 0 di as err "convergence not achieved"
     ereturn display, level(`level') `eopt'
     di as txt "Equations: {bf:ref} = reference (control) hazard, " ///
         "{bf:exc} = excess hazard"

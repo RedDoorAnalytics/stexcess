@@ -65,6 +65,17 @@ struct _stx_edata {               // estimation blocks for the d2 evaluators
 }
 
 // ========================================================================= //
+// utilities
+// ========================================================================= //
+
+// user-facing error: clean one-line message + return code, no Mata traceback
+void _stx_error(real scalar rc, string scalar msg)
+{
+    errprintf("%s\n", msg)
+    exit(rc)
+}
+
+// ========================================================================= //
 // quadrature, knots, spline bases
 // ========================================================================= //
 
@@ -97,7 +108,7 @@ real colvector _stx_knots(real colvector v, real scalar df)
     real colvector s, out
     real scalar n, j, pos, lo, f
 
-    if (rows(v) == 0) _error(3498, "no events to site spline knots")
+    if (rows(v) == 0) _stx_error(2000, "no events to site spline knots")
     s = sort(v, 1)
     n = rows(s)
     out = J(df + 1, 1, .)
@@ -114,11 +125,10 @@ real colvector _stx_knots(real colvector v, real scalar df)
 // times are heavily tied, and bad user-supplied knot lists)
 void _stx_checkknots(real colvector kn, string scalar what)
 {
-    if (rows(kn) < 2) _error(3498, what + ": at least 2 knots (df >= 1) required")
-    if (missing(kn)) _error(3498, what + ": knots contain missing values")
+    if (rows(kn) < 2) _stx_error(459, what + ": at least 2 knots (df >= 1) required")
+    if (missing(kn)) _stx_error(459, what + ": knots contain missing values")
     if (min(kn[|2 \ rows(kn)|] - kn[|1 \ rows(kn) - 1|]) <= 0) {
-        // NB: _error()'s message is capped at ~100 characters
-        _error(3498, what + ": knots not strictly increasing " +
+        _stx_error(459, what + ": knots not strictly increasing " +
             "(too few distinct event times?)")
     }
 }
@@ -446,10 +456,10 @@ void _stx_checkts(struct _stx_comp scalar C, string scalar touse,
         if (C.ts[s].offvar == "" & C.ts[s].moffvar == "") continue
         off = _stx_offdata(C.ts[s].offvar, C.ts[s].moffvar, touse, rows(t), "")
         if (missing(off)) {
-            _error(3498, what + ": offset variables contain missing values")
+            _stx_error(459, what + ": offset variables contain missing values")
         }
         if (min(t + off) <= 0 | min(t0 + off) < 0) {
-            _error(3498, what + " time" + strofreal(C.ts[s].num) +
+            _stx_error(459, what + " time" + strofreal(C.ts[s].num) +
                 "(): t + offset must be > 0 (log scale); use the time option?")
         }
     }
@@ -538,6 +548,7 @@ transmorphic _stx_optimize(pointer(real function) scalar fn,
     | real scalar maxiter)
 {
     transmorphic S
+    real scalar v
 
     S = optimize_init()
     optimize_init_evaluator(S, fn)
@@ -547,7 +558,17 @@ transmorphic _stx_optimize(pointer(real function) scalar fn,
     optimize_init_technique(S, "nr")
     optimize_init_tracelevel(S, (trace ? "value" : "none"))
     optimize_init_valueid(S, "log likelihood")
-    if (args() == 5) optimize_init_conv_maxiter(S, maxiter)
+    // user maximize options from the wrapper (empty locals -> defaults);
+    // an explicit maxiter argument (the starting-values pre-fit) wins
+    v = strtoreal(st_local("_stx_ptol"))
+    if (v < .) optimize_init_conv_ptol(S, v)
+    v = strtoreal(st_local("_stx_vtol"))
+    if (v < .) optimize_init_conv_vtol(S, v)
+    v = strtoreal(st_local("_stx_nrtol"))
+    if (v < .) optimize_init_conv_nrtol(S, v)
+    v = strtoreal(st_local("_stx_iterate"))
+    if (args() == 5)  optimize_init_conv_maxiter(S, maxiter)
+    else if (v < .)   optimize_init_conv_maxiter(S, v)
     (void) _optimize(S)
     return(S)
 }
@@ -568,7 +589,7 @@ struct _stx_model scalar _stx_getmodel()
     external pointer(struct _stx_model scalar) scalar STX_FIT
 
     if (STX_FIT == NULL) {
-        _error(3498, "no stexcess fit in memory; run (or rerun) stexcess first")
+        _stx_error(301, "no stexcess fit in memory; run (or rerun) stexcess first")
     }
     return(*STX_FIT)
 }
@@ -585,11 +606,11 @@ struct _stx_model scalar _stx_usemodel()
     // two steps: Mata | does not short-circuit, and mreldif() requires
     // conformable arguments
     if (cols(eb) != cols(M.b)) {
-        _error(3498, "fit in memory does not match e(b) " +
+        _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
     if (mreldif(eb, M.b) > 1e-12) {
-        _error(3498, "fit in memory does not match e(b) " +
+        _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
     return(M)
@@ -619,17 +640,17 @@ void _stx_fit()
     d   = st_data(., st_local("_stx_d"), touse)
     ind = st_data(., st_local("_stx_ind"), touse)
     n   = rows(t)
-    twostage = st_numscalar("_stx_twostage")
+    twostage = st_local("_stx_twostage") == "1"
     trace = st_local("_stx_nolog") == ""
 
     // input validation
-    if (min(t) <= 0) _error(3498, "all exit times must be > 0")
-    if (min(t0) < 0 | min(t - t0) <= 0) _error(3498, "require 0 <= t0 < t for every record")
+    if (min(t) <= 0) _stx_error(459, "all exit times must be > 0")
+    if (min(t0) < 0 | min(t - t0) <= 0) _stx_error(459, "require 0 <= t0 < t for every record")
     cm = ind :== 0
     pm = ind :== 1
-    if (sum(cm) + sum(pm) < n) _error(3498, "indicator must be coded 0 (reference) / 1 (excess)")
-    if (!sum(pm :& (d :== 1))) _error(3498, "no excess events: cannot site the excess baseline knots")
-    if (twostage & !sum(cm)) _error(3498, "twostage requires reference (control) records")
+    if (sum(cm) + sum(pm) < n) _stx_error(450, "indicator must be coded 0 (reference) / 1 (excess)")
+    if (!sum(pm :& (d :== 1))) _stx_error(2000, "no excess events: cannot site the excess baseline knots")
+    if (twostage & !sum(cm)) _stx_error(2000, "twostage requires reference (control) records")
 
     // component specs: ref knots from ALL events, exc from patient events
     _stx_compspec(M.ref, "ref", touse, t, d :== 1, "reference")
@@ -660,7 +681,7 @@ void _stx_fit()
     }
     st_local("_stx_atvars", invtokens(uniqrows(atvars')'))
 
-    G = st_numscalar("_stx_nnodes")
+    G = strtoreal(st_local("_stx_nnodes"))
     glm = _stx_gl(G)
     nd = glm[., 1]
     w  = glm[., 2]
@@ -699,7 +720,7 @@ void _stx_fit()
     k  = D.pr + pe
     if (missing(D.CDev) | missing(D.CWq) | missing(D.RDev) | missing(D.RWq) |
         missing(D.EDev) | missing(D.EWq)) {
-        _error(3498, "design contains missing values " +
+        _stx_error(459, "design contains missing values " +
             "(offset variables missing, or log of a non-positive timescale?)")
     }
 
@@ -717,7 +738,7 @@ void _stx_fit()
     fromname = st_local("_stx_from")
     if (fromname != "") {
         if (cols(st_matrix(fromname)) != k) {
-            _error(3498, "from(): matrix must have " + strofreal(k) +
+            _stx_error(198, "from(): matrix must have " + strofreal(k) +
                 " columns (one per model parameter)")
         }
         b0 = st_matrix(fromname)
@@ -782,13 +803,12 @@ void _stx_fit()
     M.V  = V
     _stx_putmodel(M)
 
-    st_matrix("_stx_b", b)
-    st_matrix("_stx_V", V)
-    st_numscalar("_stx_ll", ll)
-    st_numscalar("_stx_N", n)
-    st_numscalar("_stx_k", k)
-    st_numscalar("_stx_conv", conv)
-    st_numscalar("_stx_iter", iter)
+    st_matrix(st_local("_stx_bmat"), b)
+    st_matrix(st_local("_stx_Vmat"), V)
+    st_local("_stx_ll",   strofreal(ll, "%21.0g"))
+    st_local("_stx_k",    strofreal(k))
+    st_local("_stx_conv", strofreal(conv))
+    st_local("_stx_iter", strofreal(iter))
     st_local("_stx_names",
         strtrim(_stx_names(M.ref, "ref") + _stx_names(M.exc, "exc")))
 }
@@ -865,7 +885,7 @@ real colvector _stx_datcol(string scalar name, string scalar touse,
     if (v < .) return(J(m, 1, v))
     if (zeros) return(J(m, 1, 0))
     if (_st_varindex(name) >= .) {
-        _error(3498, "variable " + name + " not found; supply it with at()")
+        _stx_error(111, "variable " + name + " not found; supply it with at()")
     }
     return(st_data(., name, touse))
 }
@@ -1314,7 +1334,7 @@ void _stx_storeback(string scalar touse, real colvector est,
     real colvector lci, uci
 
     st_store(., st_local("_stx_out"), touse, est)
-    if (!st_numscalar("_stx_ci")) return
+    if (st_local("_stx_ci") == "") return
     lci = .
     uci = .
     _stx_delta(est, Jc, M.V, transform, level, lci, uci)
@@ -1335,7 +1355,7 @@ void _stx_predict(real scalar level)
     touse = st_local("_stx_touse")
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
-    doJ = st_numscalar("_stx_ci")
+    doJ = st_local("_stx_ci") != ""
     zeros = st_local("_stx_zeros") != ""
     Xr = Xe = OFFr = OFFe = .
     ind = .
@@ -1361,7 +1381,7 @@ void _stx_contrast(real scalar level)
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     kind = st_local("_stx_kind")
-    doJ = st_numscalar("_stx_ci")
+    doJ = st_local("_stx_ci") != ""
     zeros = st_local("_stx_zeros") != ""
     needind = _stx_needind(q)
     Xr = Xe = OFFr = OFFe = .
@@ -1402,7 +1422,7 @@ void _stx_standsurv(real scalar level)
     pop = st_local("_stx_poptouse")
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
-    doJ = st_numscalar("_stx_ci")
+    doJ = st_local("_stx_ci") != ""
     zeros = st_local("_stx_zeros") != ""
     npop = rows(st_data(., pop, pop))
     Xr = Xe = OFFr = OFFe = .

@@ -111,17 +111,19 @@ program stexcess_p
         }
     }
 
-    // ---- output variable names ----
-    local _stx_out `varlist'
+    // ---- output variables: built as tempvars so a failed prediction
+    // leaves nothing behind, renamed into place on success ----
     if "`ci'" != "" {
         confirm new variable `varlist'_lci `varlist'_uci
     }
-    qui gen double `varlist' = .
+    tempvar out lci uci
+    local _stx_out `out'
+    qui gen double `out' = .
     if "`ci'" != "" {
-        local _stx_lci `varlist'_lci
-        local _stx_uci `varlist'_uci
-        qui gen double `_stx_lci' = .
-        qui gen double `_stx_uci' = .
+        local _stx_lci `lci'
+        local _stx_uci `uci'
+        qui gen double `lci' = .
+        qui gen double `uci' = .
     }
 
     local _stx_timevar  `timevar'
@@ -129,7 +131,7 @@ program stexcess_p
     local _stx_quantity `quantity'
     local _stx_kind     `kind'
     local _stx_zeros    `zeros'
-    scalar _stx_ci = ("`ci'" != "")
+    local _stx_ci       `ci'
 
     if `docontrast' {
         mata: _stx_contrast(`level')
@@ -148,7 +150,13 @@ program stexcess_p
         mata: _stx_predict(`level')
         local qlabel "stexcess `stat'"
     }
-    scalar drop _stx_ci
+    rename `out' `varlist'
+    if "`ci'" != "" {
+        rename `lci' `varlist'_lci
+        rename `uci' `varlist'_uci
+        local _stx_lci `varlist'_lci
+        local _stx_uci `varlist'_uci
+    }
 
     // limits at t = 0 (log-time splines cannot be evaluated there)
     local one  survival netsurvival sratio
