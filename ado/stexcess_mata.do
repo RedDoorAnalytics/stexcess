@@ -547,10 +547,6 @@ transmorphic _stx_optimize(pointer(real function) scalar fn,
     optimize_init_technique(S, "nr")
     optimize_init_tracelevel(S, (trace ? "value" : "none"))
     optimize_init_valueid(S, "log likelihood")
-    // tighter than the 1e-5 default so refits land on the same optimum, but
-    // loose enough that the scaled-gradient criterion is reachable once the
-    // value has stopped improving at machine precision
-    optimize_init_conv_nrtol(S, 1e-8)
     if (args() == 5) optimize_init_conv_maxiter(S, maxiter)
     (void) _optimize(S)
     return(S)
