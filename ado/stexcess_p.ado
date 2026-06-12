@@ -151,11 +151,12 @@ program stexcess_p
     else if "`standardise'" != "" {
         qui count if `touse'
         if r(N) > 1000 & "`timevar'" == "_t" {
-            di as txt "note: standardised predictions are evaluated at " ///
-                "every observation's _t (" as res %9.0fc r(N) as txt ///
-                " time points); computation time is proportional to the" ///
-                _n "      number of distinct times -- consider a time " ///
-                "grid via timevar()"
+            local nfmt = strtrim(string(r(N), "%12.0fc"))
+            di as txt "{p}note: standardised predictions are " ///
+                "evaluated at every observation's {cmd:_t} (`nfmt' time " ///
+                "points); computation time is proportional to the " ///
+                "number of distinct times -- consider a time grid via " ///
+                "{cmd:timevar()}{p_end}"
         }
         if `dooverride' preserve
         _stx_compute, driver(_stx_standsurv(`level')) atspec(`at') ///

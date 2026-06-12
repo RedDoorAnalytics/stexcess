@@ -184,8 +184,8 @@ program Estimate, eclass
                 }
             }
             if "`dropped'" != "" {
-                di as txt "note: `dropped' omitted from the `eqn' " ///
-                    "equation because of collinearity"
+                di as txt "{p}note: `dropped' omitted from the " ///
+                    "`eqn' equation because of collinearity{p_end}"
             }
             // NB: term by term -- fvrevar applied to several levels of one
             // factor re-applies base logic and zeroes the first level
@@ -339,8 +339,8 @@ program Display
     di _col(49) as txt "Excess records    =" as res %10.0gc e(N_exc)
     di as txt "Log likelihood = " as res %10.0g e(ll)
     if "`e(method)'" == "twostage" {
-        di as txt "Two-stage estimation: reference fitted to controls " ///
-            "only; stacked sandwich variance."
+        di as txt "{p}Two-stage estimation: reference fitted to " ///
+            "controls only; stacked sandwich variance.{p_end}"
     }
     if e(converged) == 0 di as err "convergence not achieved"
     if e(N_clust) < . {
@@ -349,8 +349,8 @@ program Display
             as res "`e(clustvar)'" as txt ")"
     }
     ereturn display, level(`level') `eopt'
-    di as txt "Equations: {bf:ref} = reference (control) hazard, " ///
-        "{bf:exc} = excess hazard"
+    di as txt "{p}Equations: {bf:ref} = reference (control) " ///
+        "hazard, {bf:exc} = excess hazard{p_end}"
 end
 
 // parse one model spec: [varlist][, model_options]; results in s().
