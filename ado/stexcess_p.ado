@@ -149,6 +149,14 @@ program stexcess_p
         restore
     }
     else if "`standardise'" != "" {
+        qui count if `touse'
+        if r(N) > 1000 & "`timevar'" == "_t" {
+            di as txt "note: standardised predictions are evaluated at " ///
+                "every observation's _t (" as res %9.0fc r(N) as txt ///
+                " time points); computation time is proportional to the" ///
+                _n "      number of distinct times -- consider a time " ///
+                "grid via timevar()"
+        }
         if `dooverride' preserve
         _stx_compute, driver(_stx_standsurv(`level')) atspec(`at') ///
             standardise `copt'

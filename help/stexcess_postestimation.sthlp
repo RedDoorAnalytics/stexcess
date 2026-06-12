@@ -99,6 +99,13 @@ gives the marginal all-cause survival had everyone been a patient, averaged
 over the observed age distribution. Difference/ratio statistics and
 {opt logchazard} are not available with {opt standardise}.
 
+{pstd}
+Computation time is proportional to the number of {bf:distinct} evaluation
+times multiplied by the population size: without {opt timevar()} the default
+evaluates at every observation's {cmd:_t}, which is slow in large datasets --
+prefer a time grid as above (each distinct time is evaluated once, so
+constant or gridded {opt timevar()}s are cheap).
+
 
 {title:Remarks}
 

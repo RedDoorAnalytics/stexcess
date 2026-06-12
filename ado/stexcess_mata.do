@@ -1450,28 +1450,41 @@ void _stx_standest(struct _stx_model scalar M, real colvector times,
     real colvector est, real matrix Jc)
 {
     real matrix glm, Jsum
-    real colvector nd, w, gsum
-    real scalar N, W, lo, hi, m, k
+    real colvector nd, w, gsum, ut, ts, idx, o
+    real scalar N, W, lo, hi, m, k, i, j
 
+    // evaluate each distinct time once (cost is O(times x population));
+    // constant or gridded timevars then cost a single pass
     m = rows(times)
+    ut = uniqrows(times)
+    idx = J(m, 1, .)
+    o = order(times, 1)
+    ts = times[o]
+    j = 1
+    for (i = 1; i <= m; i++) {
+        while (ut[j] < ts[i]) j++
+        idx[o[i]] = j
+    }
+
     k = cols(M.b)
     N = rows(OFFrpop)
     W = sum(wpop)
     glm = _stx_gl(G)
     nd = glm[., 1]
     w  = glm[., 2]
-    gsum = J(m, 1, 0)
-    Jsum = J(m, k, 0)
+    gsum = J(rows(ut), 1, 0)
+    Jsum = J(rows(ut), k, 0)
     for (lo = 1; lo <= N; lo = lo + chunk) {
         hi = min((lo + chunk - 1, N))
-        _stx_std_chunk(M, times,
+        _stx_std_chunk(M, ut,
             (cols(Xrpop) ? Xrpop[|lo, 1 \ hi, .|] : J(hi - lo + 1, 0, 0)),
             (cols(Xepop) ? Xepop[|lo, 1 \ hi, .|] : J(hi - lo + 1, 0, 0)),
             OFFrpop[|lo, 1 \ hi, .|], OFFepop[|lo, 1 \ hi, .|],
             indpop[|lo \ hi|], wpop[|lo \ hi|], q, nd, w, doJ, gsum, Jsum)
     }
-    est = gsum :/ W
-    Jc = Jsum :/ W
+    est = gsum[idx, 1] :/ W   // explicit subscripts: a 1 x 1 gsum
+                               // would otherwise transpose the result
+    Jc = Jsum[idx, .] :/ W
 }
 
 // ========================================================================= //
