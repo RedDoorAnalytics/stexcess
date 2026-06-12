@@ -68,6 +68,21 @@ predict rsr, sratio at1(age 70 female 0 patient 1) ///
 
 See `help stexcess` and `help stexcess postestimation` for the full syntax.
 
+## Performance
+
+Wall-clock times on an Apple Silicon laptop (StataNow/MP 19.5), 200,000
+records, df(3) on both components:
+
+| task | stexcess v2 | v1 (merlin-based) |
+|---|---:|---:|
+| fit, 1 covariate per equation | ~5 s | ~500 s |
+| fit, 20 covariates per equation (48 parameters) | ~18 s | — |
+| standardised survival + CI, 50-point grid | ~11 s | — |
+
+Standardised predictions cost is proportional to the number of distinct
+evaluation times multiplied by the population size — use a `timevar()`
+grid rather than the default (every observation's `_t`).
+
 ## Validation
 
 The Mata core is certified against the likelihood of the original
