@@ -119,6 +119,11 @@ program Estimate, eclass
         tempvar clid
         qui egen long `clid' = group(`clustvar') if `touse'
         markout `touse' `clid'
+        qui su `clid' if `touse', meanonly
+        if r(max) < 2 {
+            di as err "vce(cluster `clustvar') requires at least 2 clusters"
+            exit 498
+        }
     }
 
     qui count if !inlist(`indicator', 0, 1) & `touse'
@@ -151,8 +156,9 @@ program Estimate, eclass
         di as err "no events among excess (indicator = 1) records"
         exit 2000
     }
-    if "`twostage'" != "" & `nref' == 0 {
-        di as err "twostage requires reference (indicator = 0) records"
+    if `nref' == 0 {
+        di as err "no reference (indicator = 0) records; a modelled " ///
+            "excess hazard model requires a control cohort"
         exit 2000
     }
 
@@ -311,10 +317,15 @@ program Estimate, eclass
         ereturn local wexp  `"= `wvar'"'
     }
     ereturn local  title     "Modelled excess hazard model"
+    // margins is not supported: the linear predictors are restricted cubic
+    // splines on (log) time, so e(b) carries time-basis pseudo-covariates
+    // (_rcs1, ...) that margins cannot map to data variables. Marginal
+    // effects come from predict's at()/standardise/contrasts instead (with
+    // analytic delta-method CIs), as in stpm2/merlin.
     local mnotok Hazard CHazard LOGCHazard SURVival CIF RMST TIMELost ///
         NETSurvival EXCesshazard RMSTNet HDIFFerence SDIFFerence ///
         CIFDIFFerence RMSTDIFFerence HRatio SRatio CIFRatio RMSTRatio ///
-        STANDardise
+        STANDardise SCOres
     ereturn local marginsnotok "`mnotok'"
     ereturn local  indicator "`indicator'"
     ereturn local  refvars   "`refvars'"

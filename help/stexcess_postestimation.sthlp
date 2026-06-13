@@ -107,6 +107,26 @@ prefer a time grid as above (each distinct time is evaluated once, so
 constant or gridded {opt timevar()}s are cheap).
 
 
+{title:Scores and margins}
+
+{pstd}
+{cmd:predict} {it:stub}{cmd:*}{cmd:, scores} stores one variable per
+{cmd:e(b)} coefficient: the contribution of each estimation-sample record to
+the (weighted) score for that parameter. Summed over the sample they give the
+gradient (~0 at the optimum), and their cross-product reproduces the
+robust/cluster sandwich; base and omitted factor-variable terms get
+all-zero columns. They are useful for {helpb suest}, hand-built variance
+estimators and influence diagnostics.
+
+{pstd}
+{helpb margins} is not supported: the linear predictors are restricted cubic
+splines on (log) time, so {cmd:e(b)} carries time-basis pseudo-covariates
+({cmd:_rcs1}, ...) that {cmd:margins} cannot map to variables (as for
+{cmd:stpm2} and {cmd:merlin}). Obtain population-averaged and
+covariate-specific quantities from {opt standardise}, {opt at()} and the
+difference/ratio statistics above, which carry analytic delta-method CIs.
+
+
 {title:Remarks}
 
 {pstd}

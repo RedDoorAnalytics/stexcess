@@ -90,6 +90,45 @@ assert "`e(vce)'" == "cluster" & e(N_clust) == `ncl'
 predict s2, netsurvival ci at(age 0)
 assert !missing(s2[1])
 
+// ---- single-cluster guard (#4) ----
+gen byte onecl = 1
+rcof "stexcess `spec', indicator(excess) vce(cluster onecl)" == 498
+
+// ---- if/in hardening (#4): subsetting behaves ----
+// (id = _n: controls are id<=2000, patients id>2000)
+gen byte sub = inrange(id, 1001, 3000)          // 1000 controls + 1000 patients
+
+// estimation if == fitting on the kept subset
+preserve
+qui stexcess `spec' if sub, indicator(excess) nolog
+local ll_if = e(ll)
+local n_if  = e(N)
+keep if sub
+qui stexcess `spec', indicator(excess) nolog
+assert reldif(e(ll), `ll_if') < 1e-10 & e(N) == `n_if'
+restore
+
+// a modelled excess hazard model requires control records: zero controls
+// is rejected cleanly (not a silent degenerate fit)
+rcof "stexcess `spec' if excess == 1, indicator(excess)" == 2000
+
+// predict if restricts output only; values match the full-sample predict
+qui stexcess `spec', indicator(excess) nolog
+predict pf, survival at(age 0 excess 1)
+predict pi if sub, survival at(age 0 excess 1)
+assert reldif(pf, pi) < 1e-12 if sub & !missing(pi)
+qui count if !missing(pi)
+local nsub = r(N)
+qui count if sub
+assert `nsub' == r(N)                            // filled exactly the subset
+qui count if !missing(pi) & !sub
+assert r(N) == 0
+
+// standardise population stays e(sample) under predict if
+predict ms_all, survival standardise timevar(survtime) at(excess 1)
+predict ms_sub if sub, survival standardise timevar(survtime) at(excess 1)
+assert reldif(ms_all, ms_sub) < 1e-10 if sub & !missing(ms_sub)
+
 // ---- errors ----
 rcof "stexcess `spec', indicator(excess) vce(bootstrap)" == 198
 stset survtime [iw=one], failure(died)

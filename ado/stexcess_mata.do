@@ -1552,6 +1552,96 @@ void _stx_predict(real scalar level)
     _stx_stash(est, Jc, M, _stx_transform(q), level)
 }
 
+// predict, scores: per-record contributions to the gradient, one variable
+// per e(b) column (base/omitted factor terms get 0). Summed over the
+// estimation sample they give the (weighted) gradient, ~0 at the optimum,
+// and reproduce the robust/cluster sandwich. The estimation-sample design
+// blocks are rebuilt here exactly as the fit did (the wrapper supplies the
+// factor-variable maps in _stx_refmap/_stx_excmap, as for predict).
+void _stx_scores()
+{
+    struct _stx_model scalar M
+    string scalar touse
+    string rowvector mr, me, outv
+    real colvector t, t0, d, ind, nd, w, cm, pm, wgt, wd, cw
+    real colvector eC, eR, eE, pir, he, ciIdx, piIdx
+    real matrix Xr, Xe, OFFr, OFFe, glm, Dev, Wq
+    real matrix CDev, CWq, RDev, RWq, EDev, EWq, Sc, Spr, Spe, Sincl, Sfull
+    real colvector Ccw, Rcw, Ecw, Cd, Pd
+    real scalar n, G, pr, pe, k, kfull, twostage, j
+
+    M = _stx_usemodel()
+    touse = st_local("_stx_touse")
+    t   = st_data(., "_t",  touse)
+    t0  = st_data(., "_t0", touse)
+    d   = st_data(., "_d",  touse)
+    ind = st_data(., M.indvar, touse)
+    n   = rows(t)
+    wgt = (M.wvar == "" ? J(n, 1, 1) : st_data(., M.wvar, touse))
+    wd  = wgt :* d
+    cm  = ind :== 0
+    pm  = ind :== 1
+    twostage = st_global("e(method)") == "twostage"
+
+    mr = tokens(st_local("_stx_refmap"))
+    me = tokens(st_local("_stx_excmap"))
+    Xr = (cols(mr) ? st_data(., mr, touse) : J(n, 0, 0))
+    Xe = (cols(me) ? st_data(., me, touse) : J(n, 0, 0))
+    OFFr = _stx_offmat(M.ref, touse, n)
+    OFFe = _stx_offmat(M.exc, touse, n)
+
+    G = st_numscalar("e(chintpoints)")
+    glm = _stx_gl(G)
+    nd = glm[., 1]
+    w  = glm[., 2]
+
+    Dev = Wq = cw = .
+    _stx_qdesign(select(t, cm), select(t0, cm),
+        (cols(Xr) ? select(Xr, cm) : J(sum(cm), 0, 0)), select(OFFr, cm),
+        M.ref, nd, w, select(wgt, cm), CDev, CWq, Ccw)
+    Cd = select(wd, cm)
+    _stx_qdesign(select(t, pm), select(t0, pm),
+        (cols(Xr) ? select(Xr, pm) : J(sum(pm), 0, 0)), select(OFFr, pm),
+        M.ref, nd, w, select(wgt, pm), RDev, RWq, Rcw)
+    _stx_qdesign(select(t, pm), select(t0, pm),
+        (cols(Xe) ? select(Xe, pm) : J(sum(pm), 0, 0)), select(OFFe, pm),
+        M.exc, nd, w, select(wgt, pm), EDev, EWq, Ecw)
+    Pd = select(wd, pm)
+    pr = M.pr
+    k  = cols(M.b)
+    pe = k - pr
+
+    eC = Ccw :* exp(CWq * M.b[(1..pr)]')
+    eE = Ecw :* exp(EWq * M.b[((pr + 1)..k)]')
+    he = exp(EDev * M.b[((pr + 1)..k)]')
+    // patient reference hazard: the shared theta_ref in both methods
+    pir = exp(RDev * M.b[(1..pr)]') :/ (exp(RDev * M.b[(1..pr)]') + he)
+
+    Sc  = Cd :* CDev - _stx_qsum(eC, CWq, G)             // controls, ref block
+    Spe = (Pd :* (1 :- pir)) :* EDev - _stx_qsum(eE, EWq, G)  // patients, exc
+    // patients' reference-block score: present under joint ML, but zero under
+    // two-stage (stage 1 estimates theta_ref from controls only)
+    if (!twostage) {
+        eR  = Rcw :* exp(RWq * M.b[(1..pr)]')
+        Spr = (Pd :* pir) :* RDev - _stx_qsum(eR, RWq, G)
+    }
+
+    Sincl = J(n, k, 0)
+    ciIdx = selectindex(cm)
+    piIdx = selectindex(pm)
+    if (rows(ciIdx)) Sincl[ciIdx, (1..pr)] = Sc
+    if (rows(piIdx)) {
+        if (!twostage) Sincl[piIdx, (1..pr)] = Spr
+        Sincl[piIdx, ((pr + 1)..k)] = Spe
+    }
+    kfull = _stx_kfull(M.ref) + _stx_kfull(M.exc)
+    Sfull = J(n, kfull, 0)
+    Sfull[., M.bsel] = Sincl
+
+    outv = tokens(st_local("_stx_scorevars"))
+    for (j = 1; j <= kfull; j++) st_store(., outv[j], touse, Sfull[., j])
+}
+
 // contrast: the wrapper applies at1(), calls _stx_cside1(), restores,
 // applies at2(), then _stx_cside2() combines and stashes
 void _stx_cside1()

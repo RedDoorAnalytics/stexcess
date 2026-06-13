@@ -7,6 +7,18 @@
 
 program stexcess_p
     version 19.5
+    // scores produce one variable per e(b) coefficient (a stub*/varlist) and
+    // take a separate code path from the single-statistic predictions
+    syntax anything(name=nvl) [if] [in] [, SCOres * ]
+    if "`scores'" != "" {
+        _stx_p_scores `nvl'
+        exit
+    }
+    _stx_predict_one `0'
+end
+
+program _stx_predict_one
+    version 19.5
 
     syntax newvarname [if] [in], [ ///
         SURVival CIF Hazard CHazard LOGCHazard RMST TIMELost ///
@@ -263,4 +275,57 @@ program _stx_compute
         local _stx_poptouse `pop'
     }
     mata: `driver'
+end
+
+// predict stub*, scores -- one variable per e(b) coefficient, the per-record
+// contribution to the (weighted) gradient over the estimation sample. They
+// sum to ~0 at the optimum and reproduce the robust/cluster sandwich.
+program _stx_p_scores
+    args nvl
+    if "`e(cmd)'" != "stexcess" error 301
+
+    local kfull = colsof(e(b))
+    if substr("`nvl'", -1, 1) == "*" {
+        local stub = substr("`nvl'", 1, length("`nvl'") - 1)
+        forvalues j = 1/`kfull' {
+            local names `names' `stub'`j'
+        }
+    }
+    else {
+        local names `nvl'
+        if `: word count `names'' != `kfull' {
+            di as err "scores: `kfull' new variables required (one per " ///
+                "e(b) coefficient); specify that many, or a stub*"
+            exit 198
+        }
+    }
+    confirm new variable `names'
+    foreach v of local names {
+        qui gen double `v' = .
+    }
+
+    // estimation sample; factor-variable maps as for predict (no at()/zeros)
+    tempvar touse
+    qui gen byte `touse' = e(sample)
+    local _stx_touse     `touse'
+    local _stx_scorevars `names'
+    mata: _stx_mapinfo()                  // -> _stx_refdat, _stx_excdat
+    local _stx_refmap ""
+    foreach trm in `_stx_refdat' {
+        fvrevar `trm'
+        local _stx_refmap `_stx_refmap' `r(varlist)'
+    }
+    local _stx_excmap ""
+    foreach trm in `_stx_excdat' {
+        fvrevar `trm'
+        local _stx_excmap `_stx_excmap' `r(varlist)'
+    }
+    mata: _stx_scores()
+
+    local cn : colfullnames e(b)
+    local j = 1
+    foreach v of local names {
+        label var `v' "score: `: word `j' of `cn''"
+        local ++j
+    }
 end
