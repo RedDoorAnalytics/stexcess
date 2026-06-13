@@ -853,8 +853,9 @@ void _stx_fit()
             eC = D.Ccw :* exp(D.CWq * thr)
             eR = D.Rcw :* exp(D.RWq * thr)
             eE = D.Ecw :* exp(D.EWq * the)
-            pi = exp(D.RDev * thr) :/
-                 (exp(D.RDev * thr) + exp(D.EDev * the))
+            hr = exp(D.RDev * thr)
+            he = exp(D.EDev * the)
+            pi = hr :/ (hr + he)
             Sc  = D.Cd :* D.CDev - _stx_qsum(eC, D.CWq, G)
             Spr = (D.Pd :* pi) :* D.RDev - _stx_qsum(eR, D.RWq, G)
             Spe = (D.Pd :* (1 :- pi)) :* D.EDev - _stx_qsum(eE, D.EWq, G)
@@ -1564,7 +1565,7 @@ void _stx_scores()
     string scalar touse
     string rowvector mr, me, outv
     real colvector t, t0, d, ind, nd, w, cm, pm, wgt, wd, cw
-    real colvector eC, eR, eE, pir, he, ciIdx, piIdx
+    real colvector eC, eR, eE, pir, hr, he, ciIdx, piIdx
     real matrix Xr, Xe, OFFr, OFFe, glm, Dev, Wq
     real matrix CDev, CWq, RDev, RWq, EDev, EWq, Sc, Spr, Spe, Sincl, Sfull
     real colvector Ccw, Rcw, Ecw, Cd, Pd
@@ -1615,7 +1616,8 @@ void _stx_scores()
     eE = Ecw :* exp(EWq * M.b[((pr + 1)..k)]')
     he = exp(EDev * M.b[((pr + 1)..k)]')
     // patient reference hazard: the shared theta_ref in both methods
-    pir = exp(RDev * M.b[(1..pr)]') :/ (exp(RDev * M.b[(1..pr)]') + he)
+    hr  = exp(RDev * M.b[(1..pr)]')
+    pir = hr :/ (hr + he)
 
     Sc  = Cd :* CDev - _stx_qsum(eC, CWq, G)             // controls, ref block
     Spe = (Pd :* (1 :- pir)) :* EDev - _stx_qsum(eE, EWq, G)  // patients, exc
