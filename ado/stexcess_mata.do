@@ -1561,8 +1561,10 @@ void _stx_predict(real scalar level)
 
 // predict, scores: per-record contributions to the gradient, one variable
 // per e(b) column (base/omitted factor terms get 0). Summed over the
-// estimation sample they give the (weighted) gradient, ~0 at the optimum,
-// and reproduce the robust/cluster sandwich. The estimation-sample design
+// estimation sample they give the (weighted) gradient, ~0 at the optimum;
+// for the joint fit their cross-product is the robust/cluster sandwich meat
+// (two-stage scores give the meat only -- that variance also needs the
+// stacked bread). The estimation-sample design
 // blocks are rebuilt here exactly as the fit did (the wrapper supplies the
 // factor-variable maps in _stx_refmap/_stx_excmap, as for predict).
 void _stx_scores()

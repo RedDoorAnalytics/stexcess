@@ -40,7 +40,7 @@ not allowed inside {opt tvc()} or as offset variables.{p_end}
 {synopt :{opt two:stage}}two-stage estimation with sandwich (robust) standard errors{p_end}
 {synopt :{opt vce(robust)}, {opt vce(cluster clustvar)}}robust or cluster-robust standard errors{p_end}
 {synopt :{opt chint:points(#)}}Gauss-Legendre nodes for cumulative hazards (default 30){p_end}
-{synopt :{opt from(matname)}}starting values (one column per model parameter){p_end}
+{synopt :{opt from(matname)}}starting values, one column per {cmd:e(b)} coefficient (including base/omitted factor-variable terms){p_end}
 {synopt :{opt iter:ate(#)}}maximum number of Newton-Raphson iterations{p_end}
 {synopt :{opt tol:erance(#)}}coefficient-vector convergence tolerance{p_end}
 {synopt :{opt ltol:erance(#)}}log-likelihood convergence tolerance{p_end}
@@ -192,7 +192,7 @@ stacked sandwich variance{p_end}
 {synopt:{cmd:e(k)}}number of parameters{p_end}
 {synopt:{cmd:e(df_m)}}model degrees of freedom (covariate coefficients){p_end}
 {synopt:{cmd:e(rank)}}rank of {cmd:e(V)}{p_end}
-{synopt:{cmd:e(ic)}}number of iterations{p_end}
+{synopt:{cmd:e(ic)}, {cmd:e(iterations)}}number of iterations{p_end}
 {synopt:{cmd:e(dfref)}, {cmd:e(dfexc)}}baseline spline df{p_end}
 {synopt:{cmd:e(chintpoints)}}quadrature nodes{p_end}
 {synopt:{cmd:e(converged)}}1 if the optimiser converged{p_end}
@@ -203,10 +203,11 @@ stacked sandwich variance{p_end}
 {synopt:{cmd:e(method)}}{cmd:joint} or {cmd:twostage}{p_end}
 {synopt:{cmd:e(vce)}}{cmd:oim}, {cmd:robust} or {cmd:cluster}{p_end}
 {synopt:{cmd:e(clustvar)}, {cmd:e(N_clust)}}cluster variable and number of clusters{p_end}
-{synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage} or {cmd:pweight}s{p_end}
+{synopt:{cmd:e(vcetype)}}{cmd:Robust} with {opt twostage}, {cmd:pweight}s, {opt vce(robust)} or {opt vce(cluster)}{p_end}
 {synopt:{cmd:e(wtype)}, {cmd:e(wexp)}}weight type and variable, when stset with weights{p_end}
 {synopt:{cmd:e(indicator)}}excess indicator variable{p_end}
 {synopt:{cmd:e(refvars)}, {cmd:e(excvars)}}covariates in each equation{p_end}
+{synopt:{cmd:e(tvcref)}, {cmd:e(tvc)}}main-timescale time-varying covariates in each equation{p_end}
 {synopt:{cmd:e(knotsref)}, {cmd:e(knotsexc)}}baseline knots used (transformed scale){p_end}
 {synopt:{cmd:e(knotsref_t}{it:#}{cmd:)}, {cmd:e(knotsexc_t}{it:#}{cmd:)}}additional-timescale knots used{p_end}
 {synopt:{cmd:e(atvars)}}variables that may appear in predict's {cmd:at()} options{p_end}

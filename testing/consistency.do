@@ -27,7 +27,12 @@ stexcess (age female, df(2))(age female, df(2)), indicator(patient) nolog
 estimates store m2
 estimates table m1 m2, keep(ref:age exc:age) se
 estimates restore m1
+local ll_m1 = e(ll)
 stexcess                                      // replay from restored e()
+assert reldif(e(ll), `ll_m1') < 1e-12         // replay leaves e() intact
+stexcess, eform                               // eform replay also works
+assert reldif(e(ll), `ll_m1') < 1e-12 & "`e(method)'" == "joint"
+assert e(converged) == 1
 lrtest m2 m1, force                           // nested spline df, same terms
 
 di as txt _n "consistency.do completed."

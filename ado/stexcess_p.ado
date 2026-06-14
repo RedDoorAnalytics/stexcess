@@ -279,7 +279,9 @@ end
 
 // predict stub*, scores -- one variable per e(b) coefficient, the per-record
 // contribution to the (weighted) gradient over the estimation sample. They
-// sum to ~0 at the optimum and reproduce the robust/cluster sandwich.
+// sum to ~0 at the optimum; for the joint fit their cross-product reproduces
+// the robust/cluster sandwich meat (the two-stage scores give the meat only,
+// since that variance also needs the stacked bread).
 program _stx_p_scores
     args nvl
     if "`e(cmd)'" != "stexcess" error 301

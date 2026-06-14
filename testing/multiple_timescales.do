@@ -63,4 +63,14 @@ assert "`e(knotsref_t2)'" != "" & "`e(knotsref_t3)'" != ""
 predict s4, survival ci at(age 0 cancer 1)
 assert !missing(s4[1]) & s4[1] > 0 & s4[1] <= 1.0001
 
+// ---- baseline offset()/moffset() (shift _t before the baseline transform) --
+// identity-scale baseline so the shift cannot drive the argument non-positive;
+// exercises the baseline offset/moffset path outside merlin_oracle
+gen double shift0 = 0.25
+stexcess (age, df(2) time offset(agecat) moffset(shift0))(age, df(2)), ///
+    indicator(cancer) nolog
+assert e(converged) == 1
+predict s5, survival ci at(age 0 cancer 1)
+assert !missing(s5[1]) & s5[1] > 0 & s5[1] <= 1.0001
+
 di as txt _n "multiple_timescales.do completed."
