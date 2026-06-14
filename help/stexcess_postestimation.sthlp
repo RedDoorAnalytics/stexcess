@@ -113,10 +113,18 @@ constant or gridded {opt timevar()}s are cheap).
 {cmd:predict} {it:stub}{cmd:*}{cmd:, scores} stores one variable per
 {cmd:e(b)} coefficient: the contribution of each estimation-sample record to
 the (weighted) score for that parameter. Summed over the sample they give the
-gradient (~0 at the optimum), and their cross-product reproduces the
-robust/cluster sandwich; base and omitted factor-variable terms get
+gradient (~0 at the optimum); base and omitted factor-variable terms get
 all-zero columns. They are useful for {helpb suest}, hand-built variance
 estimators and influence diagnostics.
+
+{pstd}
+With no weights, {cmd:pweight}s or {cmd:vce(robust)}/{cmd:vce(cluster)}, the
+score cross-product reproduces the corresponding sandwich (apply the small-
+sample factor {it:N}/({it:N}-1), or {it:G}/({it:G}-1) over clusters, as
+{cmd:stexcess} does). Under {cmd:fweight}s the scores are the per-record
+gradient contributions {it:w}{cmd:*}{it:s}; their raw cross-product is not the
+{cmd:fweight} (expanded-data) sandwich, which sums {it:w}{cmd:*}{it:ss'} rather
+than {it:w}{cmd:^2}{cmd:*}{it:ss'}.
 
 {pstd}
 {helpb margins} is not supported: the linear predictors are restricted cubic

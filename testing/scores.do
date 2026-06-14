@@ -137,10 +137,41 @@ forvalues j = 1/`pr' {                          // ref block, patient rows == 0
 di as txt "[C] twostage: block-diagonal score structure confirmed"
 
 // ======================================================================== //
-// D: pweights -- weighted scores carry the weight (sum to the weighted
-// gradient ~ 0)
+// D: pweights -- weighted scores (w*s) reproduce the robust sandwich. The
+// oim bread is the iweight e(V) (iw and pw share the pseudo-likelihood and
+// Hessian; only the variance estimator differs), so the pweight sandwich is
+// bread * (n/(n-1)) cross(scores) * bread, exactly as for the unweighted case.
 // ======================================================================== //
+stset survtime [iw=w], failure(died)
+qui stexcess (age, df(3))(age, df(3)), indicator(excess) nolog
+matrix Aiw = e(V)                              // oim bread at the weighted fit
 stset survtime [pw=w], failure(died)
+qui stexcess (age, df(3))(age, df(3)), indicator(excess) nolog
+capture drop sc*
+predict sc*, scores
+qui replace esamp = e(sample)
+unab scv : sc*
+foreach v of local scv {                       // still the (weighted) gradient
+    qui su `v' if esamp
+    assert abs(r(mean)*r(N)) < 1e-2
+}
+qui count if esamp
+local n = r(N)
+mata {
+    S = st_data(., tokens(st_local("scv")), "esamp")
+    st_matrix("Vrep", st_matrix("Aiw") * ///
+        ((`n'/(`n'-1)) * cross(S, S)) * st_matrix("Aiw"))
+}
+mata: st_local("dpw", strofreal(mreldif(st_matrix("e(V)"), st_matrix("Vrep"))))
+assert `dpw' < 1e-7
+di as txt "[D] pweights: scores reproduce robust sandwich, reldif `dpw'"
+
+// fweights: the scores remain the per-record gradient contributions (sum to
+// the gradient), but their cross-product is the w^2-sum, NOT the fweight
+// (expanded-data) sandwich -- so it is the unweighted/pweight/cluster
+// sandwich that scores reproduce, not the fweight one (see the help).
+gen int fw = 1 + floor(3*runiform())
+stset survtime [fw=fw], failure(died)
 qui stexcess (age, df(3))(age, df(3)), indicator(excess) nolog
 capture drop sc*
 predict sc*, scores
@@ -150,7 +181,7 @@ foreach v of local scv {
     qui su `v' if esamp
     assert abs(r(mean)*r(N)) < 1e-2
 }
-di as txt "[D] pweights: weighted scores sum to ~0"
+di as txt "[D] fweights: scores are the gradient contributions"
 stset survtime, failure(died)
 
 // ======================================================================== //

@@ -923,8 +923,12 @@ void _stx_fit()
                 Sc = Sc :/ sqrt(select(wgt, cm))
                 Sp = Sp :/ sqrt(select(wgt, pm))
             }
-            B = (cross(Sc, Sc), J(D.pr, pe, 0) \
-                 J(pe, D.pr, 0), cross(Sp, Sp))
+            // same finite-sample factor as the joint path: N/(N-1), with N
+            // the summed weights under fweights and the record count otherwise
+            fac = (M.wtype == "fweight" ? sum(wgt) / (sum(wgt) - 1)
+                                        : n / (n - 1))
+            B = fac :* (cross(Sc, Sc), J(D.pr, pe, 0) \
+                        J(pe, D.pr, 0), cross(Sp, Sp))
         }
         Ainv = luinv(A)
         V = Ainv * B * Ainv'
