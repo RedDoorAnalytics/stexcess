@@ -53,4 +53,14 @@ stexcess (age, knots(`e(knotsref)') ///
          (age, knots(`e(knotsexc)')), indicator(cancer) nolog
 assert reldif(e(ll), `ll') < 1e-8
 
+// ---- three timescales (baseline + time2 + time3) parse, fit and predict ----
+// guards time3()-time5(), which the syntax accepts but only time2() exercised
+gen double agecat2 = 50 + 8*runiform()        // a second offset timescale
+stexcess (age, df(2) time2(df(2) offset(agecat)) time3(df(2) offset(agecat2))) ///
+         (age, df(2)), indicator(cancer) nolog
+assert e(converged) == 1
+assert "`e(knotsref_t2)'" != "" & "`e(knotsref_t3)'" != ""
+predict s4, survival ci at(age 0 cancer 1)
+assert !missing(s4[1]) & s4[1] > 0 & s4[1] <= 1.0001
+
 di as txt _n "multiple_timescales.do completed."

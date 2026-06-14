@@ -94,6 +94,9 @@ stset survtime [iw=pw], failure(died)
 stexcess (age, df(2))(age, df(2)), indicator(excess) nolog
 assert e(N) == 2*`N'                                 // physical count
 assert "`e(vce)'" == "oim"
+// iweights cannot be paired with a sandwich variance (vce() or twostage)
+rcof "stexcess (age, df(2))(age, df(2)), indicator(excess) vce(robust)" == 101
+rcof "stexcess (age, df(2))(age, df(2)), indicator(excess) twostage" == 101
 local ll_iw = e(ll)
 matrix BI = e(b)
 matrix VI = e(V)

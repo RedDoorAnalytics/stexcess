@@ -50,7 +50,7 @@ assert e(N_ref) == 2000 & e(N_exc) == 2000
 stexcess (age one, df(2))(age, df(2)), indicator(excess)  // constant covariate
 local rv `e(refvars)'
 assert !`: list posof "one" in rv'
-rcof "stexcess (age, df(2) tvc(one) dftvc(1))(age, df(2)), indicator(excess)" == 459
+rcof "stexcess (age, df(2) tvc(one) dftvc(1))(age, df(2)), indicator(excess)" == 198
 
 // ---- predict validation ----
 stexcess (age, df(2))(age, df(2)), indicator(excess)
