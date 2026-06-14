@@ -1537,13 +1537,15 @@ void _stx_predict(real scalar level)
     string scalar touse, q
     real colvector times, est, ind, ct0
     real matrix Jc, Xr, Xe, OFFr, OFFe
-    real scalar doJ
+    real scalar doJ, G
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
+    // cumulative-hazard quadrature: never coarser than the fit (chintpoints)
+    G = max((50, st_numscalar("e(chintpoints)")))
     ct0 = (st_local("_stx_ltrunc") == "" ? J(rows(times), 1, 0)
         : st_data(., st_local("_stx_ltrunc"), touse))
     Xr = Xe = OFFr = OFFe = .
@@ -1552,7 +1554,7 @@ void _stx_predict(real scalar level)
         Xr, Xe, OFFr, OFFe, ind)
     est = .
     Jc = .
-    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, G, doJ,
         est, Jc)
     _stx_stash(est, Jc, M, _stx_transform(q), level)
 }
@@ -1658,7 +1660,7 @@ void _stx_cside1()
     string scalar touse, q
     real colvector times, e1, ind, ct0
     real matrix J1, Xr, Xe, OFFr, OFFe
-    real scalar doJ
+    real scalar doJ, G
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
@@ -1673,7 +1675,8 @@ void _stx_cside1()
     J1 = .
     _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
-    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+    G = max((50, st_numscalar("e(chintpoints)")))
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, G, doJ,
         e1, J1)
     STX_C_e1 = e1
     STX_C_J1 = (doJ ? J1 : J(0, 0, .))
@@ -1687,7 +1690,7 @@ void _stx_cside2(real scalar level)
     string scalar touse, q, kind
     real colvector times, e2, est, ind, ct0
     real matrix J2, Jc, Xr, Xe, OFFr, OFFe
-    real scalar doJ
+    real scalar doJ, G
 
     M = _stx_usemodel()
     touse = st_local("_stx_touse")
@@ -1704,7 +1707,8 @@ void _stx_cside2(real scalar level)
     Jc = .
     _stx_preddata(M, touse, rows(times), _stx_needind(q),
         Xr, Xe, OFFr, OFFe, ind)
-    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, 50, doJ,
+    G = max((50, st_numscalar("e(chintpoints)")))
+    _stx_quantity(M, times, ct0, Xr, Xe, OFFr, OFFe, ind, q, G, doJ,
         e2, J2)
     if (kind == "ratio") {
         est = STX_C_e1 :/ e2
@@ -1722,7 +1726,8 @@ void _stx_cside2(real scalar level)
 
 // standardised predict: average over e(sample); at()/zeros overrides are
 // applied across the population by the wrapper (counterfactual
-// standardisation); n_nodes = 50 (40 for rmst, outer 40), chunked at 4000
+// standardisation); inner nodes max(50, chintpoints) (max(40, .) for rmst),
+// outer rmst 40, chunked at 4000
 void _stx_standsurv(real scalar level)
 {
     struct _stx_model scalar M
@@ -1730,7 +1735,7 @@ void _stx_standsurv(real scalar level)
     real colvector times, est, taus, half_out, Sflat, no, wo, ind, wpop
     real colvector ct0, S0, A, bad
     real matrix Jc, Xr, Xe, OFFr, OFFe, glm, U, Jo, J0, JA
-    real scalar doJ, m, Mo, j, npop, cond
+    real scalar doJ, m, Mo, j, npop, cond, G, Gr
     string scalar base
 
     M = _stx_usemodel()
@@ -1739,6 +1744,9 @@ void _stx_standsurv(real scalar level)
     times = st_data(., st_local("_stx_timevar"), touse)
     q = st_local("_stx_quantity")
     doJ = st_local("_stx_ci") != ""
+    // inner cumulative-hazard quadrature: never coarser than the fit
+    G  = max((50, st_numscalar("e(chintpoints)")))
+    Gr = max((40, st_numscalar("e(chintpoints)")))
     npop = rows(st_data(., pop, pop))
     Xr = Xe = OFFr = OFFe = .
     ind = .
@@ -1760,11 +1768,11 @@ void _stx_standsurv(real scalar level)
         J0 = .
         if (q == "survival" | q == "netsurv" | q == "cif") {
             _stx_standest(M, ct0, Xr, Xe, OFFr, OFFe, ind, wpop, base,
-                50, 4000, doJ, S0, J0)
+                G, 4000, doJ, S0, J0)
             Sflat = .
             Jo = .
             _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, wpop, base,
-                50, 4000, doJ, Sflat, Jo)
+                G, 4000, doJ, Sflat, Jo)
             est = Sflat :/ S0
             est = est :+ 0 :* bad :/ (1 :- bad)
             if (doJ) Jc = (Jo :* S0 - Sflat :* J0) :/ (S0 :^ 2)
@@ -1783,13 +1791,13 @@ void _stx_standsurv(real scalar level)
         wo = glm[., 2]
         Mo = 40
         _stx_standest(M, ct0, Xr, Xe, OFFr, OFFe, ind, wpop, base,
-            40, 4000, doJ, S0, J0)
+            Gr, 4000, doJ, S0, J0)
         half_out = 0.5 :* (taus - ct0)
         U = (ct0 :+ half_out) :+ half_out * no'
         Sflat = .
         Jo = .
         _stx_standest(M, vec(U'), Xr, Xe, OFFr, OFFe, ind, wpop, base,
-            40, 4000, doJ, Sflat, Jo)
+            Gr, 4000, doJ, Sflat, Jo)
         A = half_out :* (colshape(Sflat, Mo) * wo)
         est = A :/ S0
         est = est :+ 0 :* bad :/ (1 :- bad)
@@ -1819,7 +1827,7 @@ void _stx_standsurv(real scalar level)
         Sflat = .
         Jo = .
         _stx_standest(M, vec(U'), Xr, Xe, OFFr, OFFe, ind, wpop,
-            (q == "rmstnet" ? "netsurv" : "survival"), 40, 4000, doJ,
+            (q == "rmstnet" ? "netsurv" : "survival"), Gr, 4000, doJ,
             Sflat, Jo)
         est = half_out :* (colshape(Sflat, Mo) * wo)
         if (q == "timelost") est = taus - est
@@ -1833,7 +1841,7 @@ void _stx_standsurv(real scalar level)
         _stx_stash(est, Jc, M, "log", level)
         return
     }
-    _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, wpop, q, 50, 4000, doJ,
+    _stx_standest(M, times, Xr, Xe, OFFr, OFFe, ind, wpop, q, G, 4000, doJ,
         est, Jc)
     _stx_stash(est, Jc, M, _stx_transform(q), level)
 }

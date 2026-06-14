@@ -153,8 +153,10 @@ missing. Out-of-sample prediction is allowed: predictions are computed at
 {opt timevar()} for every observation in the {it:if/in} sample using that
 row's (possibly overridden) covariate, indicator and offset values.
 Quantities that are undefined at {it:t} = 0 on the log-time scale are filled
-in with their limits (survival-type statistics 1; cumulative-hazard,
-CIF and RMST-type statistics 0).
+in with their limits (survival-type statistics and {opt sratio} 1;
+cumulative-hazard, CIF, RMST-type and difference statistics 0). The
+{opt cifratio} and {opt rmstratio} are 0/0 at {it:t} = 0 and so are left
+missing there.
 
 
 {title:Examples}

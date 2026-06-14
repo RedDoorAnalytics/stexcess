@@ -98,6 +98,12 @@ program Estimate, eclass
         di as err "vce(`vce') not allowed with iweights"
         exit 101
     }
+    if "`wtype'" == "iweight" & "`twostage'" != "" {
+        // twostage reports a stacked sandwich variance, which is not
+        // meaningful for iweights (cf. the iweight+vce() block above)
+        di as err "twostage not allowed with iweights"
+        exit 101
+    }
     marksample touse
     qui replace `touse' = 0 if _st != 1     // honour stset's analysis sample
     foreach c in ref exc {
@@ -208,7 +214,7 @@ program Estimate, eclass
                 if r(sd) == 0 | r(sd) >= . {
                     di as err "tvc variable `v' is constant " ///
                         "in the `eqn' equation"
-                    exit 459
+                    exit 198
                 }
             }
         }

@@ -214,6 +214,13 @@ stacked sandwich variance{p_end}
 {synopt:{cmd:e(b)}}coefficient vector ({cmd:ref:} and {cmd:exc:} equations){p_end}
 {synopt:{cmd:e(V)}}variance-covariance matrix{p_end}
 
+{pstd}
+Following {helpb streg}, the record counts {cmd:e(N_ref)}, {cmd:e(N_exc)} and
+{cmd:e(N_fail)} are sums of the weights when the data are {cmd:stset} with
+weights (so {cmd:e(N_ref)} + {cmd:e(N_exc)} need not equal {cmd:e(N)} under
+{cmd:iweight}s or {cmd:pweight}s). {cmd:e(N)} is the sum of the weights under
+{cmd:fweight}s and the physical observation count otherwise.
+
 
 {title:Author}
 
