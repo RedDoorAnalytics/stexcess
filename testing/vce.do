@@ -129,6 +129,19 @@ predict ms_all, survival standardise timevar(survtime) at(excess 1)
 predict ms_sub if sub, survival standardise timevar(survtime) at(excess 1)
 assert reldif(ms_all, ms_sub) < 1e-10 if sub & !missing(ms_sub)
 
+// ---- _st==1 enforcement (review #1): only stset's analysis sample is fit ----
+// stset blanks _t for _st==0 records, so markout already drops them in normal
+// data; this guards the residual case of stale or hand-set st variables (an
+// _st==0 row left carrying a valid _t, e.g. after editing or an stsplit). It
+// is the standard st-command idiom (if _st==1).
+preserve
+qui stexcess `spec', indicator(excess) nolog
+local n_clean = e(N)
+replace _st = 0 in 1                                   // valid _t/_d but _st==0
+qui stexcess `spec', indicator(excess) nolog
+assert e(N) == `n_clean' - 1                           // the _st==0 row excluded
+restore
+
 // ---- errors ----
 rcof "stexcess `spec', indicator(excess) vce(bootstrap)" == 198
 stset survtime [iw=one], failure(died)

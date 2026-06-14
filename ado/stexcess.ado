@@ -99,6 +99,7 @@ program Estimate, eclass
         exit 101
     }
     marksample touse
+    qui replace `touse' = 0 if _st != 1     // honour stset's analysis sample
     foreach c in ref exc {
         local `c'und ""
         if "``c'vars'" != "" {
