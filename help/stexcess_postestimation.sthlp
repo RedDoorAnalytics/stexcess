@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.0 stexcess postestimation (Mata core)}{...}
+{* *! version 2.1.0 stexcess postestimation (Mata core)}{...}
 {vieweralsosee "stexcess" "help stexcess"}{...}
 {title:Title}
 
@@ -30,6 +30,7 @@
 {synopt :{opt sdiff:erence}}difference in survival functions{p_end}
 {synopt :{opt cifdiff:erence}}difference in cumulative incidence functions{p_end}
 {synopt :{opt rmstdiff:erence}}difference in restricted mean survival times{p_end}
+{synopt :{opt excesshdiff:erence}}difference in excess hazard functions{p_end}
 {synopt :{opt hr:atio}}ratio of hazard functions{p_end}
 {synopt :{opt sr:atio}}ratio of survival functions{p_end}
 {synopt :{opt cifr:atio}}ratio of cumulative incidence functions{p_end}
@@ -73,10 +74,11 @@ apply.
 
 {pstd}
 The net statistics ({opt netsurvival}, {opt excesshazard}, {opt rmstnet})
-involve only the excess component and ignore the indicator. {opt excesshratio}
-is the between-pattern contrast of the last: the ratio of the excess hazard at
-{opt at1()} to that at {opt at2()} (with a log-scale delta-method CI), e.g. an
-excess-hazard ratio comparing covariate values.
+involve only the excess component and ignore the indicator.
+{opt excesshratio} and {opt excesshdifference} are the between-pattern
+contrasts of {opt excesshazard} -- the ratio (log-scale delta-method CI) and
+the difference (identity-scale CI) of the excess hazard at {opt at1()} versus
+{opt at2()}, e.g. an excess-hazard ratio comparing covariate values.
 
 {pstd}
 All confidence intervals are analytic delta-method intervals on a suitable

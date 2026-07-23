@@ -1,4 +1,4 @@
-*! stexcess_p v2.0.0 -- postestimation predictions for stexcess (Mata core)
+*! stexcess_p v2.1.0 -- postestimation predictions for stexcess (Mata core)
 *! v1-style statistics and semantics: covariates and the excess indicator are
 *! taken from the data row by row (so hazard = h_ref + ind*h_exc), overridable
 *! with at()/zeros -- e.g. at(<indicator> 0) gives reference-only quantities.
@@ -24,6 +24,7 @@ program _stx_predict_one
         SURVival CIF Hazard CHazard LOGCHazard RMST TIMELost ///
         NETSurvival EXCesshazard RMSTNet ///
         HDIFFerence SDIFFerence CIFDIFFerence RMSTDIFFerence ///
+        EXCESSHDIFFerence ///
         HRatio SRatio CIFRatio RMSTRatio EXCESSHRatio ///
         STANDardise ///
         AT(string) AT1(string) AT2(string) ZEROs ///
@@ -37,8 +38,8 @@ program _stx_predict_one
     // ---- resolve the requested statistic (exactly one) ----
     local stats survival cif hazard chazard logchazard rmst timelost ///
         netsurvival excesshazard rmstnet hdifference sdifference ///
-        cifdifference rmstdifference hratio sratio cifratio rmstratio ///
-        excesshratio
+        cifdifference rmstdifference excesshdifference ///
+        hratio sratio cifratio rmstratio excesshratio
     local q ""
     foreach opt of local stats {
         if "``opt''" != "" local q `q' `opt'
@@ -53,12 +54,13 @@ program _stx_predict_one
     // statistic -> Mata quantity (+ contrast kind)
     local kind ""
     if inlist("`stat'", "hdifference", "sdifference", "cifdifference", ///
-        "rmstdifference") local kind difference
+        "rmstdifference", "excesshdifference") local kind difference
     if inlist("`stat'", "hratio", "sratio", "cifratio", "rmstratio", ///
         "excesshratio") local kind ratio
     local quantity "`stat'"
     if "`kind'" != "" {
-        if "`stat'" == "excesshratio" local quantity excesshazard
+        if inlist("`stat'", "excesshratio", "excesshdifference") ///
+            local quantity excesshazard
         else local quantity = cond(substr("`stat'", 1, 1) == "h", "hazard", ///
             cond(substr("`stat'", 1, 1) == "s", "survival", ///
             cond(substr("`stat'", 1, 3) == "cif", "cif", "rmst")))

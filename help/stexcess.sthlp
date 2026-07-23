@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.0 stexcess (Mata core)}{...}
+{* *! version 2.1.0 stexcess (Mata core)}{...}
 {vieweralsosee "stexcess postestimation" "help stexcess_postestimation"}{...}
 {title:Title}
 

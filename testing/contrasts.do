@@ -71,19 +71,24 @@ predict rr, rmstratio      at1(`A') at2(`B') timevar(tt) ci
 assert reldif(rd, rA - rB) < 1e-9 if !missing(rd)
 assert reldif(rr, rA / rB) < 1e-9 if !missing(rr) & tt > 0
 
-// ---- excess-hazard ratio (excess-only; ignores the indicator) ----
+// ---- excess-hazard ratio / difference (excess-only; ignore the indicator) --
 predict eA, excesshazard timevar(tt) at(`A')
 predict eB, excesshazard timevar(tt) at(`B')
-predict er, excesshratio at1(`A') at2(`B') timevar(tt) ci
+predict er, excesshratio      at1(`A') at2(`B') timevar(tt) ci
+predict ed, excesshdifference at1(`A') at2(`B') timevar(tt) ci
 assert reldif(er, eA / eB) < 1e-9 if !missing(er)
-assert !missing(er_lci[2]) & !missing(er_uci[2])      // CI produced
+assert reldif(ed, eA - eB) < 1e-9 if !missing(ed)
+assert !missing(er_lci[2]) & !missing(er_uci[2])      // CIs produced
+assert !missing(ed_lci[2]) & !missing(ed_uci[2])
 
 // ---- self-contrast: difference == 0, ratio == 1 ----
 predict hd0, hdifference at1(`A') at2(`A') timevar(tt)
 predict hr1, hratio      at1(`A') at2(`A') timevar(tt)
-predict er1, excesshratio at1(`A') at2(`A') timevar(tt)
+predict er1, excesshratio      at1(`A') at2(`A') timevar(tt)
+predict ed0, excesshdifference at1(`A') at2(`A') timevar(tt)
 assert abs(hd0) < 1e-10 if !missing(hd0)
 assert reldif(hr1, 1) < 1e-10 if !missing(hr1)
 assert reldif(er1, 1) < 1e-10 if !missing(er1)
+assert abs(ed0) < 1e-10 if !missing(ed0)
 
 di as txt _n "contrasts.do completed."

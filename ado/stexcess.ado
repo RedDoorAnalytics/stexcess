@@ -1,4 +1,4 @@
-*! stexcess v2.0.0  (Mata core)  -- modelled excess hazard models
+*! stexcess v2.1.0  (Mata core)  -- modelled excess hazard models
 *! Syntax follows the original (merlin-based) stexcess v1.1.1:
 *!   stexcess (refspec)(excspec) [if][in], indicator(varname) [options]
 *! where each model spec is  [varlist][, model_options]  with per-component
