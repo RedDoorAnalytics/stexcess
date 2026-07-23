@@ -1,7 +1,8 @@
 // contrasts.do -- the hazard/CIF/RMST difference and ratio prediction
 // statistics (hdifference, hratio, cifdifference, cifratio, rmstdifference,
-// rmstratio). basic_run.do covers sdifference/sratio; this file certifies the
-// remaining six contrasts via the defining identity:
+// rmstratio) plus the excess-hazard ratio (excesshratio). basic_run.do covers
+// sdifference/sratio; this file certifies the remaining contrasts via the
+// defining identity:
 //   Xdifference at1(A) at2(B) == [X at(A)] - [X at(B)]
 //   Xratio      at1(A) at2(B) == [X at(A)] / [X at(B)]
 // computed from the same fit, so agreement is to machine precision.
@@ -70,10 +71,19 @@ predict rr, rmstratio      at1(`A') at2(`B') timevar(tt) ci
 assert reldif(rd, rA - rB) < 1e-9 if !missing(rd)
 assert reldif(rr, rA / rB) < 1e-9 if !missing(rr) & tt > 0
 
+// ---- excess-hazard ratio (excess-only; ignores the indicator) ----
+predict eA, excesshazard timevar(tt) at(`A')
+predict eB, excesshazard timevar(tt) at(`B')
+predict er, excesshratio at1(`A') at2(`B') timevar(tt) ci
+assert reldif(er, eA / eB) < 1e-9 if !missing(er)
+assert !missing(er_lci[2]) & !missing(er_uci[2])      // CI produced
+
 // ---- self-contrast: difference == 0, ratio == 1 ----
 predict hd0, hdifference at1(`A') at2(`A') timevar(tt)
 predict hr1, hratio      at1(`A') at2(`A') timevar(tt)
+predict er1, excesshratio at1(`A') at2(`A') timevar(tt)
 assert abs(hd0) < 1e-10 if !missing(hd0)
 assert reldif(hr1, 1) < 1e-10 if !missing(hr1)
+assert reldif(er1, 1) < 1e-10 if !missing(er1)
 
 di as txt _n "contrasts.do completed."

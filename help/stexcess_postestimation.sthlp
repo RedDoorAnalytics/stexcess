@@ -34,6 +34,7 @@
 {synopt :{opt sr:atio}}ratio of survival functions{p_end}
 {synopt :{opt cifr:atio}}ratio of cumulative incidence functions{p_end}
 {synopt :{opt rmstr:atio}}ratio of restricted mean survival times{p_end}
+{synopt :{opt excesshr:atio}}ratio of excess hazard functions{p_end}
 {synoptline}
 
 {synoptset 22 tabbed}{...}
@@ -72,13 +73,16 @@ apply.
 
 {pstd}
 The net statistics ({opt netsurvival}, {opt excesshazard}, {opt rmstnet})
-involve only the excess component and ignore the indicator.
+involve only the excess component and ignore the indicator. {opt excesshratio}
+is the between-pattern contrast of the last: the ratio of the excess hazard at
+{opt at1()} to that at {opt at2()} (with a log-scale delta-method CI), e.g. an
+excess-hazard ratio comparing covariate values.
 
 {pstd}
 All confidence intervals are analytic delta-method intervals on a suitable
-transformed scale (log for hazards, cumulative hazards and RMST-type
-quantities; complementary log-log for survival-type quantities; identity for
-differences).
+transformed scale (log for hazards, cumulative hazards, RMST-type quantities
+and all ratios; complementary log-log for survival-type quantities; identity
+for differences).
 
 
 {title:Standardisation}

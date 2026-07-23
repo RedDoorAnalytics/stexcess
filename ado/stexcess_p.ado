@@ -24,7 +24,7 @@ program _stx_predict_one
         SURVival CIF Hazard CHazard LOGCHazard RMST TIMELost ///
         NETSurvival EXCesshazard RMSTNet ///
         HDIFFerence SDIFFerence CIFDIFFerence RMSTDIFFerence ///
-        HRatio SRatio CIFRatio RMSTRatio ///
+        HRatio SRatio CIFRatio RMSTRatio EXCESSHRatio ///
         STANDardise ///
         AT(string) AT1(string) AT2(string) ZEROs ///
         TImevar(varname numeric) LTRUNCated(varname numeric) ///
@@ -37,7 +37,8 @@ program _stx_predict_one
     // ---- resolve the requested statistic (exactly one) ----
     local stats survival cif hazard chazard logchazard rmst timelost ///
         netsurvival excesshazard rmstnet hdifference sdifference ///
-        cifdifference rmstdifference hratio sratio cifratio rmstratio
+        cifdifference rmstdifference hratio sratio cifratio rmstratio ///
+        excesshratio
     local q ""
     foreach opt of local stats {
         if "``opt''" != "" local q `q' `opt'
@@ -53,11 +54,12 @@ program _stx_predict_one
     local kind ""
     if inlist("`stat'", "hdifference", "sdifference", "cifdifference", ///
         "rmstdifference") local kind difference
-    if inlist("`stat'", "hratio", "sratio", "cifratio", "rmstratio") ///
-        local kind ratio
+    if inlist("`stat'", "hratio", "sratio", "cifratio", "rmstratio", ///
+        "excesshratio") local kind ratio
     local quantity "`stat'"
     if "`kind'" != "" {
-        local quantity = cond(substr("`stat'", 1, 1) == "h", "hazard", ///
+        if "`stat'" == "excesshratio" local quantity excesshazard
+        else local quantity = cond(substr("`stat'", 1, 1) == "h", "hazard", ///
             cond(substr("`stat'", 1, 1) == "s", "survival", ///
             cond(substr("`stat'", 1, 3) == "cif", "cif", "rmst")))
     }

@@ -62,6 +62,8 @@ rcof "predict z5, survival at1(age 1) at2(age 0)" == 198  // needs ?diff/?ratio
 rcof "predict z6, sdifference at1(age 1) at2(age 0) standardise" == 198
 rcof "predict z7, sdifference at(age 1) at1(age 1) at2(age 0)" == 198
 rcof "predict z8, logchazard standardise" == 198
+rcof "predict z8b, excesshratio at(age 1)" == 198        // ratio needs at1/at2
+rcof "predict z8c, excesshratio at1(age 1) at2(age 0) standardise" == 198
 gen double z9_lci = .
 rcof "predict z9, survival ci" == 110                // CI name collision
 
