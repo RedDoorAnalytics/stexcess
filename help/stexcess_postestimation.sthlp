@@ -135,6 +135,36 @@ covariate-specific quantities from {opt standardise}, {opt at()} and the
 difference/ratio statistics above, which carry analytic delta-method CIs.
 
 
+{title:Compatibility with predictnl}
+
+{pstd}
+All {cmd:predict} statistics work inside {helpb predictnl}, which forms
+standard errors and confidence intervals for arbitrary (possibly nonlinear)
+functions of them by numerically differentiating with respect to {cmd:e(b)}.
+Pass the point quantity to the {cmd:predict()} function and let {cmd:predictnl}
+build the interval -- do {bf:not} also give {cmd:predict}'s own {opt ci}:
+
+{phang2}{cmd:. predictnl double h = predict(hazard at(age 70) timevar(tt)), ci(lo hi)}{p_end}
+
+{pstd}
+{cmd:predictnl} reports its interval on the natural (identity) scale, whereas
+{cmd:predict}'s built-in {opt ci} uses a transformed scale (log for hazards,
+cumulative hazards and RMST-type quantities; complementary log-log for
+survival-type quantities). The point estimates are identical either way; to
+reproduce {cmd:predict}'s transformed-scale interval, apply the transform
+inside {cmd:predict()} and back-transform the limits, e.g. for a hazard
+
+{phang2}{cmd:. predictnl double lh = log(predict(hazard at(age 70) timevar(tt))), ci(l u)}{p_end}
+{phang2}{cmd:. generate h_lci = exp(l)}{p_end}
+{phang2}{cmd:. generate h_uci = exp(u)}{p_end}
+
+{pstd}
+(or {cmd:log(-log(predict(survival ...)))} for a survivor function). For the
+statistics {cmd:predict} already provides, its analytic delta-method intervals
+are faster and need no wrapping; {cmd:predictnl} is the route for further
+transformations or combinations of the predicted quantities.
+
+
 {title:Remarks}
 
 {pstd}

@@ -667,20 +667,33 @@ struct _stx_model scalar _stx_getmodel()
 struct _stx_model scalar _stx_usemodel()
 {
     struct _stx_model scalar M
-    real matrix eb
+    real matrix eb, b0
 
-    M = _stx_getmodel()
+    M  = _stx_getmodel()
     eb = st_matrix("e(b)")
-    // two steps: Mata | does not short-circuit, and subscripting requires
-    // the columns to exist
-    if (cols(eb) < max(M.bsel)) {
+    // Anchor the staleness check on e(_stx_b0), a hidden copy of the fitted
+    // coefficients posted at fit time. It travels with the estimation results
+    // (so estimates restore of a different fit is still caught) but predictnl
+    // never touches it: predictnl builds its numerical derivatives by
+    // perturbing only e(b) (and, for its CI validation step, temporarily
+    // reposting e(V) as the identity). Anchoring on e(b) -- as before -- made
+    // predict fail inside predictnl; anchoring on e(V) would fail that CI step.
+    b0 = st_matrix("e(_stx_b0)")
+    // stepwise: Mata | does not short-circuit, and subscripting below needs the
+    // columns to exist (the two guards are safe scalar comparisons)
+    if (cols(eb) < max(M.bsel) | cols(b0) != cols(eb)) {
         _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
-    if (mreldif(eb[M.bsel], M.b) > 1e-12) {
+    if (mreldif(b0[M.bsel], M.b) > 1e-12) {
         _stx_error(301, "fit in memory does not match e(b) " +
             "(estimates restore?); rerun stexcess")
     }
+    // Predict from the currently active coefficients so predictnl's e(b)
+    // perturbations propagate through predict. For an ordinary predict, e(b)
+    // equals the stored fit, so this changes nothing. (_stx_getmodel returns a
+    // by-value copy, so overwriting M.b here does not disturb the store.)
+    M.b = eb[M.bsel]
     return(M)
 }
 

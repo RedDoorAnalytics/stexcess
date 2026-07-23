@@ -265,6 +265,13 @@ program Estimate, eclass
     matrix rownames `V' = `names'
 
     ereturn post `b' `V', esample(`touse') obs(`nobs') depname(_t)
+    // hidden copy of the fitted coefficients: the staleness anchor read by
+    // predict (_stx_usemodel). It travels with estimates store/restore yet is
+    // left untouched by predictnl, so predict works inside predictnl (which
+    // perturbs e(b)) while a stale store is still caught. See _stx_usemodel.
+    tempname b0
+    matrix `b0' = e(b)
+    ereturn hidden matrix _stx_b0 = `b0'
     ereturn scalar ll        = `_stx_ll'
     ereturn scalar k         = `_stx_k'
     ereturn scalar df_m     = `: word count `refvars'' + ///
