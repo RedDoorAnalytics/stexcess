@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.0  ?????2023}{...}
+{* *! version 1.1.2  09oct2026}{...}
 {vieweralsosee "stexcess postestimation" "help stexcess_postestimation"}{...}
 {vieweralsosee "merlin" "help merlin"}{...}
 {vieweralsosee "stmerlin" "help stmerlin"}{...}
@@ -20,7 +20,7 @@ hazard model with a modelled expected rate{p_end}
 {bf:indicator}({varname}) [{bf:,} {help stexcess##options:{it:options}}]
 
 {phang2}
-where {it:control_model} and {it:excess_model} are specified with
+where {it:reference_model} and {it:excess_model} are specified with
 {p_end}
 
 {phang3}        
@@ -219,14 +219,25 @@ rather than the default of log time.
 
 {title:Examples}
 
-{phang}Fit a flexible parametric excess hazard model:{p_end}
-{cmd:    . use simdata, clear}
+{pstd}Simulate a reference population and a cancer population in one dataset. Everyone has the
+reference hazard; those with {cmd:cancer==1} have an excess hazard as well:{p_end}
+{cmd:    . clear}
+{cmd:    . set seed 725}
+{cmd:    . set obs 3000}
+{cmd:    . generate byte cancer = runiform()>0.5}
+{cmd:    . generate double age = rnormal(0,10)}
+{cmd:    . generate byte sex = runiform()>0.5}
+{cmd:    . generate double t1 = (-ln(runiform())/(0.01*exp(0.01*age + 0.2*sex)))^(1/1.5)}
+{cmd:    . generate double t2 = (-ln(runiform())/(0.02*exp(0.02*age + 0.3*sex)))^(1/1.2) if cancer}
+{cmd:    . generate double stime = min(t1, t2, 10)}
+{cmd:    . generate byte died = stime<10}
 {cmd:    . stset stime, failure(died)}
-{cmd:    . stmerlin (age sex, df(3))(age sex, df(2)), indicator(cancer)}
+
+{phang}Fit a flexible parametric excess hazard model:{p_end}
+{cmd:    . stexcess (age sex, df(3))(age sex, df(2)), indicator(cancer)}
 
 {phang}Model time-dependent effects:{p_end}
-{cmd:    . stmerlin (age sex, df(3) tvc(age) dftvc(1))}
-{cmd:               (age sex, df(2)), indicator(cancer)}
+{cmd:    . stexcess (age sex, df(3) tvc(age) dftvc(1))(age sex, df(2)), indicator(cancer)}
 
 
 {title:Author}

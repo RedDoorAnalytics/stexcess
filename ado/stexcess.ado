@@ -1,7 +1,10 @@
-*! version 1.1.1  16may2024
+*! version 1.1.2  09oct2026
 
 /*
 History
+v1.1.2
+- bug fix; tvc() stopped with an invalid name error in every call, now fixed
+- help file examples corrected
 v1.1.1
 - bug fix; predictions re-synced
 v1.1.0
@@ -235,7 +238,7 @@ program _parsemodel, sclass
                 
                 local Ntvc : word count `tvc'
                 local Ntvcdf : word count `dftvc'
-                if `Ntvcdf''>1 & `Ntvcdf'!=`Ntvc' {
+                if `Ntvcdf'>1 & `Ntvcdf'!=`Ntvc' {
                         di as error "Number of dftvc() elements do not match tvc()"
                         exit 198
                 }
