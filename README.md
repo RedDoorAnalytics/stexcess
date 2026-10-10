@@ -29,7 +29,7 @@ net install stmerlin, from("https://reddooranalytics.se/install/stata/stmerlin/1
 ## Installation
 
 ```stata
-net install stexcess, from("https://raw.githubusercontent.com/RedDoorAnalytics/stexcess/main/")
+net install stexcess, from("https://reddooranalytics.se/install/stata/stexcess/latest/")
 ```
 
 ## Example
