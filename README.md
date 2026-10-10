@@ -19,7 +19,7 @@ After estimation, `predict` gives survival, hazard, cumulative hazard and cumula
 
 ## Requirements
 
-stexcess 1.1.2 supports Stata 17 or later, merlin 2.5.0 or 2.6.0, and stmerlin 1.1.2. It does not support merlin 3.0.0.
+stexcess 1.1.3 supports Stata 17 or later, merlin 2.5.0 or 2.6.0, and stmerlin 1.1.2. It does not support merlin 3.0.0.
 
 ```stata
 net install merlin, from("https://reddooranalytics.se/install/stata/merlin/2.5.0/")
@@ -64,7 +64,9 @@ The example above, predictions after it, a spline and a fractional polynomial of
 
 ## Version
 
-Version 1.1.2.
+Version 1.1.3.
+
+**1.1.3.** An error while obtaining starting values returns its error code: it returned 0, so a do-file carried on with no model. `stmerlin` is checked for at the start, and the messages shown when `merlin` or `stmerlin` is missing give their install lines. The post-estimation help file's example is corrected, and the help says that `dftvc()` is required with `tvc()`.
 
 **1.1.2.** The time-dependent effects option, `tvc()`, works: in 1.1.1 it stopped with an error in every call. The examples in the help file are corrected.
 

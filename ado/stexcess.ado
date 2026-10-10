@@ -1,7 +1,13 @@
-*! version 1.1.2  09oct2026
+*! version 1.1.3  10oct2026
 
 /*
 History
+v1.1.3
+- bug fix; an error while obtaining starting values returned code 0, now returns the error's code
+- stmerlin is now checked for; the messages shown when merlin or stmerlin is missing give their install
+  lines from reddooranalytics.se, in place of ssc install merlin
+- postestimation help file: the example now calls stexcess and simulates its data
+- help file: dftvc() is required with tvc(), now stated; text on options stexcess does not have removed
 v1.1.2
 - bug fix; tvc() stopped with an invalid name error in every call, now fixed
 - help file examples corrected
@@ -34,7 +40,14 @@ program Estimate, eclass
         
         cap which merlin
         if _rc>0 {
-                di as txt "The {bf:merlin} package is required; type {bf:ssc install merlin}"
+                di as txt "The {bf:merlin} package is required; type"
+                di as txt `"{bf:net install merlin, from("https://reddooranalytics.se/install/stata/merlin/2.5.0/")}"'
+                exit 198
+        }
+        cap which stmerlin
+        if _rc>0 {
+                di as txt "The {bf:stmerlin} package is required; type"
+                di as txt `"{bf:net install stmerlin, from("https://reddooranalytics.se/install/stata/stmerlin/1.1.2/")}"'
                 exit 198
         }
         
@@ -121,7 +134,7 @@ program Estimate, eclass
                 }
                 if _rc>0 {
                         di as error "Error in obtaining starting values"
-                        exit `_rc'
+                        exit _rc
                 }
                 mat `init1' = e(b)
                           
@@ -138,7 +151,7 @@ program Estimate, eclass
                 }
                 if _rc>0 {
                         di as error "Error in obtaining starting values"
-                        exit `_rc'
+                        exit _rc
                 }
                 mat `init2' = e(b)
                 mat `init' = `init1',`init2'

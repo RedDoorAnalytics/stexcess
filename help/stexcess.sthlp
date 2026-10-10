@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.1.2  09oct2026}{...}
+{* *! version 1.1.3  10oct2026}{...}
 {vieweralsosee "stexcess postestimation" "help stexcess_postestimation"}{...}
 {vieweralsosee "merlin" "help merlin"}{...}
 {vieweralsosee "stmerlin" "help stmerlin"}{...}
@@ -56,15 +56,15 @@ quadrature points used when calculating the cumulative hazard function{p_end}
 {synopthdr:model options}
 {synoptline}
 {synopt :{opt nocons:tant}}omit the constant term{p_end}
-{synopt :{opth df(#)}}degrees of freedom for the baseline function with 
-{cmd:rp} or {cmd:rcs} models; see details{p_end}
-{synopt :{opt knots(knots_list)}}knot locations for the baseline function 
-with {cmd:rp} or {cmd:rcs} models; see details{p_end}
+{synopt :{opth df(#)}}degrees of freedom for the baseline spline function; 
+see details{p_end}
+{synopt :{opt knots(knots_list)}}knot locations for the baseline spline 
+function; see details{p_end}
 {synopt :{opth off:set(varname)}}to add before the baseline spline function is calculated{p_end}
 {synopt :{opth moff:set(varname)}}adds the negative of {it:varname} before the baseline spline function is calculated{p_end}
 {synopt :{opth tvc(varlist)}}time-dependent effects{p_end}
 {synopt :{opth dftvc(numlist)}}degrees of freedom for each time-dependent 
-effect{p_end}
+effect; required with {cmd:tvc()}{p_end}
 {synopt :{opt tvctime}}use splines of time rather than log time for 
 time-dependent effects{p_end}
 {synopt :{opt noorth:og}}turns off the default orthogonalisation of any 
@@ -156,18 +156,12 @@ predictors.
 
 {phang}{opt noconstant} suppresses the constant (intercept) term in the linear predictor.
 
-{phang}{opt df(#)} degrees of freedom for the baseline log [cumulative] hazard function, i.e. number of restricted cubic 
-spline terms when using {cmd:distribution(rp)} or {cmd:distribution(rcs)}. Internal knots are placed at centiles of the 
+{phang}{opt df(#)} degrees of freedom for the baseline log hazard function, i.e. the number of restricted cubic 
+spline terms. Internal knots are placed at centiles of the 
 event times. Boundary knots are placed at the minimum and maximum event times.
 
-{phang}{opt knots(knots_list)} either:
-
-{phang2}defines the knot locations for the spline functions used to model the baseline 
-log [cumulative] hazard function when using {cmd:distribution(rp)} or {cmd:distribution(rcs)}. Must include boundary 
-knots. Knots should be specified in increasing order.
-
-{phang2}defines the knot locations (cut-points) of the baseline function for {cmd:distribution(pwexponential)}. Knots should 
-be specified in increasing order.
+{phang}{opt knots(knots_list)} defines the knot locations for the spline function used to model the baseline 
+log hazard function. Must include boundary knots. Knots should be specified in increasing order.
 
 {phang}
 {opt offset(varname)} defines the offset to be added to {cmd:_t} to define the baseline timescale.
@@ -177,7 +171,7 @@ be specified in increasing order.
 
 {phang}{opt tvc(varlist)} specifies the variables that have time-dependent effects. Time-dependent effects are fitted 
 using restricted cubic splines of time or log time (the default). The degrees of freedom are specified using the 
-{cmd:dftvc()} option. Note, {cmd:tvc()}s are not supported with generalised gamma, log normal or log logistic models.
+{cmd:dftvc()} option, which is required with {cmd:tvc()}.
 
 {phang}{opt dftvc(numlist)} degrees of freedom for the time-dependent effects specified in {cmd:tvc()}. If only one number is 
 specified, then the same degrees of freedom are applied to all {cmd:tvc()}s, otherwise, a number must be specified for each.
@@ -206,7 +200,7 @@ boundary knots. Knots should be specified in increasing order.
 
 {phang}{opt tvc(varlist)} specifies the variables that have time-dependent effects on the additional timescale. Time-dependent effects 
 are fitted using restricted cubic splines of time or log time (the default). The degrees of freedom are specified using the 
-{cmd:dftvc()} option. Note, {cmd:tvc()}s are not supported with generalised gamma, log normal or log logistic models.
+{cmd:dftvc()} option.
 
 {phang}{opt dftvc(numlist)} degrees of freedom for the time-dependent effects specified in {cmd:tvc()}. If only one number is 
 specified, then the same degrees of freedom are applied to all {cmd:tvc()}s, otherwise, a number must be specified for each.

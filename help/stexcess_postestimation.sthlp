@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.0  06feb2023}{...}
+{* *! version 1.1.3  10oct2026}{...}
 {vieweralsosee "stexcess" "help stexcess"}{...}
 {vieweralsosee "merlin" "help merlin"}{...}
 {viewerjumpto "Syntax" "stexcess_postestimation##syntax"}{...}
@@ -176,10 +176,22 @@ Out-of-sample prediction is allowed for all {cmd:predict} options.
 {marker examples}{...}
 {title:Examples}
 
-{phang}Fit a flexible parametric excess hazard model:{p_end}
-{cmd:    . use simdata, clear}
+{pstd}Simulate a reference population and a cancer population in one dataset. Everyone has the
+reference hazard; those with {cmd:cancer==1} have an excess hazard as well:{p_end}
+{cmd:    . clear}
+{cmd:    . set seed 725}
+{cmd:    . set obs 3000}
+{cmd:    . generate byte cancer = runiform()>0.5}
+{cmd:    . generate double age = rnormal(0,10)}
+{cmd:    . generate byte sex = runiform()>0.5}
+{cmd:    . generate double t1 = (-ln(runiform())/(0.01*exp(0.01*age + 0.2*sex)))^(1/1.5)}
+{cmd:    . generate double t2 = (-ln(runiform())/(0.02*exp(0.02*age + 0.3*sex)))^(1/1.2) if cancer}
+{cmd:    . generate double stime = min(t1, t2, 10)}
+{cmd:    . generate byte died = stime<10}
 {cmd:    . stset stime, failure(died)}
-{cmd:    . stmerlin (age sex, df(3))(age sex, df(2)), indicator(cancer)}
+
+{phang}Fit a flexible parametric excess hazard model:{p_end}
+{cmd:    . stexcess (age sex, df(3))(age sex, df(2)), indicator(cancer)}
 
 {phang}Predict the survival function for the control group:{p_end}
 {cmd:    . predict s1, survival at(cancer 0)}
